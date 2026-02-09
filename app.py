@@ -22,9 +22,12 @@ except:
 class VedicAstrologerBot:
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
-        # FORCE 1.5 FLASH (Highest Free Limits: 15 req/min)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
+        self.model = self._get_best_model()
         swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+    def _get_best_model(self):
+        # Always try Flash first (Fastest + Highest Limits)
+        return genai.GenerativeModel('gemini-1.5-flash')
 
     def _get_gana_yoni(self, nakshatra_name):
         data = {
@@ -103,11 +106,17 @@ class VedicAstrologerBot:
         '''
         
         try:
-            # Simple Attempt
+            # Attempt 1
             response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
             return response.text
         except:
-            return "The stars are aligning... please wait 1 minute and try again. 🙏 (Free Limit Reached)"
+            # Attempt 2 (Wait 5s and Retry)
+            time.sleep(5)
+            try:
+                response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
+                return response.text
+            except:
+                return "The stars are aligning... please wait 30 seconds and try again. 🙏 (Server Busy)"
 
 # --- FRONTEND UI ---
 st.title("☸️ TaraVaani")
@@ -163,58 +172,12 @@ if 'messages' not in st.session_state:
 if "edit_index" not in st.session_state:
     st.session_state.edit_index = None
 
-# 1. Show History
+# 1. SHOW HISTORY
 for i, msg in enumerate(st.session_state['messages']):
     with st.chat_message(msg["role"]):
         if st.session_state.edit_index == i:
             new_text = st.text_area("Edit:", value=msg["content"], key=f"edit_area_{i}")
-            c1, c2 = st.columns([1, 4])
-            if c1.button("Save", key=f"save_{i}"):
-                st.session_state['messages'][i]["content"] = new_text
-                st.session_state['messages'] = st.session_state['messages'][:i+1]
-                st.session_state.edit_index = None
-                st.rerun()
-            if c2.button("Cancel", key=f"cancel_{i}"):
-                st.session_state.edit_index = None
-                st.rerun()
-        else:
-            st.markdown(msg["content"])
-            if msg["role"] == "user":
-                if st.button("✏️", key=f"edit_btn_{i}"):
-                    st.session_state.edit_index = i
-                    st.rerun()
-            if msg["role"] == "assistant":
-                with st.expander("📋 Copy"):
-                    st.code(msg["content"], language=None)
-
-# 2. Logic to generate reply
-should_generate_reply = False
-last_message_content = ""
-
-if st.session_state.edit_index is None:
-    if len(st.session_state['messages']) > 0:
-        last_msg = st.session_state['messages'][-1]
-        if last_msg["role"] == "user":
-            should_generate_reply = True
-            last_message_content = last_msg["content"]
-
-if should_generate_reply:
-    if 'bot' in st.session_state:
-        with st.chat_message("assistant"):
-            with st.spinner("Reading stars..."):
-                response = st.session_state['bot'].ask_ai(last_message_content, lang)
-                st.markdown(response)
-                with st.expander("📋 Copy"):
-                    st.code(response, language=None)
-                st.session_state['messages'].append({"role": "assistant", "content": response})
-    else:
-        st.error("Please Generate Kundali first!")
-
-# 3. New Input
-if prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):
-    st.session_state['messages'].append({"role": "user", "content": prompt})
-    st.rerun()
-
+            c1
 # 3. New Input
 if prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):
     st.session_state['messages'].append({"role": "user", "content": prompt})

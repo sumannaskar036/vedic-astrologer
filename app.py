@@ -22,12 +22,9 @@ except:
 class VedicAstrologerBot:
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
-        self.model = self._get_best_model()
+        # FORCE 1.5 FLASH (Highest Free Limits: 15 req/min)
+        self.model = genai.GenerativeModel('gemini-1.5-flash')
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-
-    def _get_best_model(self):
-        # Always try Flash first (Fastest + Highest Limits)
-        return genai.GenerativeModel('gemini-1.5-flash')
 
     def _get_gana_yoni(self, nakshatra_name):
         data = {
@@ -106,17 +103,11 @@ class VedicAstrologerBot:
         '''
         
         try:
-            # Attempt 1
+            # Simple Attempt
             response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
             return response.text
         except:
-            # Attempt 2 (Wait and Retry)
-            time.sleep(5)
-            try:
-                response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
-                return response.text
-            except:
-                return "The stars are aligning... please wait 1 minute and try again. 🙏 (Server Busy)"
+            return "The stars are aligning... please wait 1 minute and try again. 🙏 (Free Limit Reached)"
 
 # --- FRONTEND UI ---
 st.title("☸️ TaraVaani")
@@ -196,7 +187,7 @@ for i, msg in enumerate(st.session_state['messages']):
                 with st.expander("📋 Copy"):
                     st.code(msg["content"], language=None)
 
-# 2. Logic to generate reply (Flat structure prevents indentation errors)
+# 2. Logic to generate reply
 should_generate_reply = False
 last_message_content = ""
 
@@ -218,6 +209,11 @@ if should_generate_reply:
                 st.session_state['messages'].append({"role": "assistant", "content": response})
     else:
         st.error("Please Generate Kundali first!")
+
+# 3. New Input
+if prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):
+    st.session_state['messages'].append({"role": "user", "content": prompt})
+    st.rerun()
 
 # 3. New Input
 if prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):

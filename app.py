@@ -80,7 +80,6 @@ def calculate_vedic_chart(name, dt, tm, lat, lon):
             
     gana, yoni = get_gana_yoni(user_nak)
     
-    # Return pure data dictionary (Easier to save in session state)
     return {
         "Name": name,
         "Lagna": lagna_sign,
@@ -100,7 +99,7 @@ def get_ai_response(user_data, question, lang):
     You are "TaraVaani", a Vedic Astrologer.
     USER: {user_data['Name']}
     CHART: {user_data['Full_Chart']}
-    DETAILS: Rashi={user_data['Rashi']}, Lagna={user_data['Lagna']}, Nakshatra={user_data['Nakshatra']}
+    DETAILS: Rashi={user_data['Rashi']}, Lagna={user_data['Lagna']}, Nakshatra={user_data['Nakshatra']}, Gana={user_data['Gana']}, Yoni={user_data['Yoni']}
     
     Question: {question}
     Language: {lang}
@@ -119,7 +118,7 @@ def get_ai_response(user_data, question, lang):
         except:
             return "Server busy (Free Tier Limit). Please wait 30s and try again. 🙏"
 
-# --- 3. STATE MANAGEMENT (The Fix) ---
+# --- 3. STATE MANAGEMENT ---
 if 'app_state' not in st.session_state:
     st.session_state.app_state = {'generated': False, 'data': None}
 
@@ -129,7 +128,6 @@ if 'messages' not in st.session_state:
 # --- 4. SIDEBAR ---
 with st.sidebar:
     st.header("Janma Kundali Details")
-    # We use keys to ensure inputs don't reset
     name = st.text_input("Name", "Suman", key="input_name")
     dob = st.date_input("Date", datetime.date(1993, 4, 23), format="DD/MM/YYYY", key="input_dob")
     
@@ -142,26 +140,24 @@ with st.sidebar:
     
     if st.button("Generate Kundali", type="primary"):
         with st.spinner("Calculating..."):
-            # Calculate and SAVE to session state
             chart_data = calculate_vedic_chart(name, dob, tob, 22.57, 88.36)
             st.session_state.app_state = {'generated': True, 'data': chart_data}
-            st.session_state.messages = [] # Clear old chat on new generation
+            st.session_state.messages = [] 
             st.rerun()
 
 # --- 5. MAIN PAGE ---
 st.title("☸️ TaraVaani")
 st.markdown("### Your AI Vedic Companion")
 
-# Check if chart is generated (Persistent Check)
 if st.session_state.app_state['generated']:
     data = st.session_state.app_state['data']
     
-    # Display Summary Table
+    # --- UPDATED DISPLAY TABLE WITH GANA & YONI ---
     with st.expander("Show Kundali Details", expanded=False):
         st.markdown(f"""
-        | **Lagna** | **Rashi** | **Nakshatra** |
-        | :--- | :--- | :--- |
-        | {data['Lagna']} | {data['Rashi']} | {data['Nakshatra']} |
+        | **Lagna** | **Rashi** | **Nakshatra** | **Gana** | **Yoni** |
+        | :--- | :--- | :--- | :--- | :--- |
+        | {data['Lagna']} | {data['Rashi']} | {data['Nakshatra']} | {data['Gana']} | {data['Yoni']} |
         """)
 
     # Chat Interface
@@ -170,12 +166,10 @@ if st.session_state.app_state['generated']:
             st.markdown(msg["content"])
 
     if prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):
-        # 1. Show User Message
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
             
-        # 2. Generate AI Reply
         with st.chat_message("assistant"):
             with st.spinner("Consulting the stars..."):
                 reply = get_ai_response(data, prompt, lang)

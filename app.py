@@ -1,4 +1,3 @@
-
 import streamlit as st
 import google.generativeai as genai
 import swisseph as swe
@@ -7,7 +6,7 @@ import datetime
 # --- 1. CONFIGURATION ---
 st.set_page_config(
     page_title="TaraVaani", 
-    page_icon="🔮", 
+    page_icon="☸️", 
     layout="centered"
 )
 
@@ -109,8 +108,7 @@ class VedicAstrologerBot:
         return response.text
 
 # --- FRONTEND UI ---
-# Title & Description Update
-st.title("🔮 TaraVaani")
+st.title("☸️ TaraVaani")
 st.markdown("### Your AI astrology companion — Vedic insights in 9 Indian languages")
 st.caption("Powered by Lahiri Ayanamsa | Precise Calculation")
 

@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import swisseph as swe
 import datetime
+import time
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(
@@ -21,12 +22,19 @@ except:
 class VedicAstrologerBot:
     def __init__(self, api_key):
         genai.configure(api_key=api_key)
-        try:
-            self.model = genai.GenerativeModel('gemini-2.0-flash')
-        except:
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
-            
+        self.model = self._get_best_model()
         swe.set_sid_mode(swe.SIDM_LAHIRI)
+
+    # SMART MODEL SELECTOR (Anti-Crash)
+    def _get_best_model(self):
+        model_priority = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
+        for model_name in model_priority:
+            try:
+                model = genai.GenerativeModel(model_name)
+                return model
+            except:
+                continue
+        return genai.GenerativeModel('gemini-1.5-flash')
 
     def _get_gana_yoni(self, nakshatra_name):
         data = {
@@ -47,7 +55,6 @@ class VedicAstrologerBot:
         utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30)
         jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
 
-        # Vedic Lagna
         cusps, ascmc = swe.houses(jd, lat, lon, b'P')
         asc_vedic = (ascmc[0] - swe.get_ayanamsa_ut(jd)) % 360
         
@@ -104,74 +111,13 @@ class VedicAstrologerBot:
         3. Use the Chart Data to answer accurately.
         4. Keep it mystical but clear.
         '''
-        response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
-        return response.text
-
-# --- FRONTEND UI ---
-st.title("☸️ TaraVaani")
-st.markdown("### Your AI astrology companion — Vedic insights in 9 Indian languages")
-st.caption("Powered by Lahiri Ayanamsa | Precise Calculation")
-
-with st.sidebar:
-    st.header("Janma Kundali Details")
-    
-    name = st.text_input("Name", "Suman")
-    st.subheader("Birth Date & Time")
-    dob = st.date_input("Date", datetime.date(1993, 4, 23), format="DD/MM/YYYY")
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        hour = st.selectbox("Hour (0-23)", range(0, 24), index=15)
-    with c2:
-        minute = st.selectbox("Minute (0-59)", range(0, 60), index=45)
-    tob = datetime.time(hour, minute)
-    
-    st.text("Location: Kolkata (Default)")
-    
-    lang = st.selectbox("Select Language", [
-        "English", "Hindi (हिंदी)", "Bengali (বাংলা)", 
-        "Marathi (मराठी)", "Punjabi (ਪੰਜਾਬੀ)", 
-        "Kannada (ಕನ್ನಡ)", "Tamil (தமிழ்)", 
-        "Telugu (తెలుగు)", "Odia (ଓଡ଼ିଆ)"
-    ])
-    
-    if st.button("Generate Kundali"):
-        if SERVER_API_KEY:
-            with st.spinner("Aligning the stars..."):
-                bot = VedicAstrologerBot(SERVER_API_KEY)
-                bot.calculate_chart(name, dob, tob, 22.57, 88.36)
-                st.session_state['bot'] = bot
-                st.success("✅ Kundali Generated")
-                st.markdown(f'''
-                | **Attribute** | **Value** |
-                | :--- | :--- |
-                | **Lagna** | {bot.user_stats['Lagna']} |
-                | **Rashi** | {bot.user_stats['Rashi']} |
-                | **Nakshatra** | {bot.user_stats['Nakshatra']} |
-                | **Gana** | {bot.user_stats['Gana']} |
-                | **Yoni** | {bot.user_stats['Yoni']} |
-                ''')
-        else:
-            st.error("Owner Error: API Key not set in secrets.")
-
-# Chat Window
-if 'messages' not in st.session_state:
-    st.session_state['messages'] = []
-
-for msg in st.session_state['messages']:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-
-if prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):
-    st.session_state['messages'].append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
-    
-    if 'bot' in st.session_state:
-        with st.chat_message("assistant"):
-            with st.spinner("Reading the celestial map..."):
-                response = st.session_state['bot'].ask_ai(prompt, lang)
-                st.markdown(response)
-                st.session_state['messages'].append({"role": "assistant", "content": response})
-    else:
-        st.error("Please Generate Kundali in the sidebar first!")
+        
+        # RETRY LOGIC
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
+                return response.text
+            except Exception as e:
+                time.sleep(1)
+                if attempt == 0: self.model = genai.GenerativeModel('gemini-1

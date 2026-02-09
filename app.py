@@ -92,7 +92,6 @@ def calculate_vedic_chart(name, dt, tm, lat, lon):
 
 def get_ai_response(user_data, question, lang):
     genai.configure(api_key=SERVER_API_KEY)
-    # Always use Flash for stability
     model = genai.GenerativeModel('gemini-1.5-flash')
     
     prompt = f'''
@@ -152,13 +151,16 @@ st.markdown("### Your AI Vedic Companion")
 if st.session_state.app_state['generated']:
     data = st.session_state.app_state['data']
     
-    # --- UPDATED DISPLAY TABLE WITH GANA & YONI ---
-    with st.expander("Show Kundali Details", expanded=False):
-        st.markdown(f"""
-        | **Lagna** | **Rashi** | **Nakshatra** | **Gana** | **Yoni** |
-        | :--- | :--- | :--- | :--- | :--- |
-        | {data['Lagna']} | {data['Rashi']} | {data['Nakshatra']} | {data['Gana']} | {data['Yoni']} |
-        """)
+    # --- CHANGED: WELCOME MESSAGE & VISIBLE TABLE ---
+    st.success("Radhe Radhe! What do you want to know today? 🙏")
+    
+    st.markdown(f"""
+    | **Lagna** | **Rashi** | **Nakshatra** | **Gana** | **Yoni** |
+    | :--- | :--- | :--- | :--- | :--- |
+    | {data['Lagna']} | {data['Rashi']} | {data['Nakshatra']} | {data['Gana']} | {data['Yoni']} |
+    """)
+    
+    st.markdown("---") # Visual separator
 
     # Chat Interface
     for msg in st.session_state.messages:

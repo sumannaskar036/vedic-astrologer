@@ -27,14 +27,11 @@ class VedicAstrologerBot:
 
     # SMART MODEL SELECTOR (Anti-Crash)
     def _get_best_model(self):
-        model_priority = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro']
-        for model_name in model_priority:
-            try:
-                model = genai.GenerativeModel(model_name)
-                return model
-            except:
-                continue
-        return genai.GenerativeModel('gemini-1.5-flash')
+        # We try the fastest model first to avoid timeouts
+        try:
+            return genai.GenerativeModel('gemini-1.5-flash')
+        except:
+            return genai.GenerativeModel('gemini-1.5-pro')
 
     def _get_gana_yoni(self, nakshatra_name):
         data = {
@@ -112,12 +109,132 @@ class VedicAstrologerBot:
         4. Keep it mystical but clear.
         '''
         
-        # RETRY LOGIC
-        max_retries = 3
-        for attempt in range(max_retries):
+        # RETRY LOGIC (Simplified to avoid Syntax Errors)
+        try:
+            response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
+            return response.text
+        except:
+            # If the first try fails, wait 2 seconds and try again
+            time.sleep(2)
             try:
-                response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
+                # Force fallback to the fastest model
+                fallback_model = genai.GenerativeModel('gemini-1.5-flash')
+                response = fallback_model.generate_content(prompt + "\\nUSER QUESTION: " + question)
                 return response.text
-            except Exception as e:
-                time.sleep(1)
-                if attempt == 0: self.model = genai.GenerativeModel('gemini-1
+            except:
+                return "The cosmic channels are busy. Please wait 10 seconds and ask again. 🙏"
+
+# --- FRONTEND UI ---
+st.title("☸️ TaraVaani")
+st.markdown("### Your AI astrology companion — Vedic insights in 9 Indian languages")
+st.caption("Powered by Lahiri Ayanamsa | Precise Calculation")
+
+with st.sidebar:
+    st.header("Janma Kundali Details")
+    
+    name = st.text_input("Name", "Suman")
+    st.subheader("Birth Date & Time")
+    dob = st.date_input("Date", datetime.date(1993, 4, 23), format="DD/MM/YYYY")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        hour = st.selectbox("Hour (0-23)", range(0, 24), index=15)
+    with c2:
+        minute = st.selectbox("Minute (0-59)", range(0, 60), index=45)
+    tob = datetime.time(hour, minute)
+    
+    st.text("Location: Kolkata (Default)")
+    
+    lang = st.selectbox("Select Language", [
+        "English", "Hindi (हिंदी)", "Bengali (বাংলা)", 
+        "Marathi (मराठी)", "Punjabi (ਪੰਜਾਬੀ)", 
+        "Kannada (ಕನ್ನಡ)", "Tamil (தமிழ்)", 
+        "Telugu (తెలుగు)", "Odia (ଓଡ଼ିଆ)"
+    ])
+    
+    if st.button("Generate Kundali"):
+        if SERVER_API_KEY:
+            with st.spinner("Aligning the stars..."):
+                bot = VedicAstrologerBot(SERVER_API_KEY)
+                bot.calculate_chart(name, dob, tob, 22.57, 88.36)
+                st.session_state['bot'] = bot
+                st.success("✅ Kundali Generated")
+                st.markdown(f'''
+                | **Attribute** | **Value** |
+                | :--- | :--- |
+                | **Lagna** | {bot.user_stats['Lagna']} |
+                | **Rashi** | {bot.user_stats['Rashi']} |
+                | **Nakshatra** | {bot.user_stats['Nakshatra']} |
+                | **Gana** | {bot.user_stats['Gana']} |
+                | **Yoni** | {bot.user_stats['Yoni']} |
+                ''')
+        else:
+            st.error("Owner Error: API Key not set in secrets.")
+
+# --- CHAT INTERFACE WITH EDIT & COPY ---
+if 'messages' not in st.session_state:
+    st.session_state['messages'] = []
+
+# Logic to handle Editing
+if "edit_index" not in st.session_state:
+    st.session_state.edit_index = None
+
+# Display Chat History
+for i, msg in enumerate(st.session_state['messages']):
+    with st.chat_message(msg["role"]):
+        
+        # If this is the message being edited, show text area
+        if st.session_state.edit_index == i:
+            new_text = st.text_area("Edit your question:", value=msg["content"], key=f"edit_area_{i}")
+            c1, c2 = st.columns([1, 4])
+            if c1.button("Save", key=f"save_{i}"):
+                st.session_state['messages'][i]["content"] = new_text
+                st.session_state['messages'] = st.session_state['messages'][:i+1] # Keep only up to this msg
+                st.session_state.edit_index = None
+                st.rerun() # Rerun to trigger AI response
+            if c2.button("Cancel", key=f"cancel_{i}"):
+                st.session_state.edit_index = None
+                st.rerun()
+        
+        else:
+            # Normal Message Display
+            st.markdown(msg["content"])
+            
+            # --- USER CONTROLS (Edit & Copy) ---
+            if msg["role"] == "user":
+                c1, c2 = st.columns([1, 8])
+                with c1:
+                    if st.button("✏️", key=f"edit_btn_{i}", help="Edit this question"):
+                        st.session_state.edit_index = i
+                        st.rerun()
+                with c2:
+                    with st.expander("📋 Copy Prompt"):
+                         st.code(msg["content"], language=None)
+            
+            # --- AI CONTROLS (Copy Only) ---
+            if msg["role"] == "assistant":
+                with st.expander("📋 Copy Answer"):
+                    st.code(msg["content"], language=None)
+
+# Handle New Input (Only if we are NOT editing)
+if st.session_state.edit_index is None:
+    # Check if we need to regenerate response (after an edit)
+    last_msg = st.session_state['messages'][-1] if st.session_state['messages'] else None
+    
+    if last_msg and last_msg["role"] == "user":
+        # The last message is User, but no Assistant reply yet. Generate it!
+        if 'bot' in st.session_state:
+            with st.chat_message("assistant"):
+                with st.spinner("Reading the celestial map..."):
+                    response = st.session_state['bot'].ask_ai(last_msg["content"], lang)
+                    st.markdown(response)
+                    with st.expander("📋 Copy Answer"):
+                        st.code(response, language=None)
+                    st.session_state['messages'].append({"role": "assistant", "content": response})
+        else:
+            st.error("Please Generate Kundali in the sidebar first!")
+
+    # Standard Chat Input
+    elif prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):
+        st.session_state['messages'].append({"role": "user", "content": prompt})
+        st.rerun()

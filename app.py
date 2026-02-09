@@ -25,13 +25,10 @@ class VedicAstrologerBot:
         self.model = self._get_best_model()
         swe.set_sid_mode(swe.SIDM_LAHIRI)
 
-    # SMART MODEL SELECTOR (Anti-Crash)
+    # SMART MODEL SELECTOR
     def _get_best_model(self):
-        # We try the fastest model first to avoid timeouts
-        try:
-            return genai.GenerativeModel('gemini-1.5-flash')
-        except:
-            return genai.GenerativeModel('gemini-1.5-pro')
+        # Always try Flash first (Fastest + Highest Limits)
+        return genai.GenerativeModel('gemini-1.5-flash')
 
     def _get_gana_yoni(self, nakshatra_name):
         data = {
@@ -109,20 +106,21 @@ class VedicAstrologerBot:
         4. Keep it mystical but clear.
         '''
         
-        # RETRY LOGIC (Simplified to avoid Syntax Errors)
+        # --- INCREASED PATIENCE LOGIC ---
         try:
+            # Attempt 1: Normal speed
             response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
             return response.text
         except:
-            # If the first try fails, wait 2 seconds and try again
-            time.sleep(2)
+            # Attempt 2: Wait 5 seconds (The "Cool Down")
+            time.sleep(5)
             try:
-                # Force fallback to the fastest model
-                fallback_model = genai.GenerativeModel('gemini-1.5-flash')
-                response = fallback_model.generate_content(prompt + "\\nUSER QUESTION: " + question)
+                # Retry with same model
+                response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
                 return response.text
             except:
-                return "The cosmic channels are busy. Please wait 10 seconds and ask again. 🙏"
+                # Final polite error
+                return "The stars are aligning... please wait 1 minute and try again. 🙏 (Server Busy)"
 
 # --- FRONTEND UI ---
 st.title("☸️ TaraVaani")
@@ -222,19 +220,4 @@ if st.session_state.edit_index is None:
     last_msg = st.session_state['messages'][-1] if st.session_state['messages'] else None
     
     if last_msg and last_msg["role"] == "user":
-        # The last message is User, but no Assistant reply yet. Generate it!
-        if 'bot' in st.session_state:
-            with st.chat_message("assistant"):
-                with st.spinner("Reading the celestial map..."):
-                    response = st.session_state['bot'].ask_ai(last_msg["content"], lang)
-                    st.markdown(response)
-                    with st.expander("📋 Copy Answer"):
-                        st.code(response, language=None)
-                    st.session_state['messages'].append({"role": "assistant", "content": response})
-        else:
-            st.error("Please Generate Kundali in the sidebar first!")
-
-    # Standard Chat Input
-    elif prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):
-        st.session_state['messages'].append({"role": "user", "content": prompt})
-        st.rerun()
+        # The last message is User

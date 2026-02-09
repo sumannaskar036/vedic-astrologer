@@ -4,6 +4,13 @@ import google.generativeai as genai
 import swisseph as swe
 import datetime
 
+# --- 1. CONFIGURATION ---
+st.set_page_config(
+    page_title="TaraVaani", 
+    page_icon="🔮", 
+    layout="centered"
+)
+
 # --- SECURITY: Get Key from Streamlit Secrets ---
 try:
     SERVER_API_KEY = st.secrets["GEMINI_API_KEY"]
@@ -84,28 +91,28 @@ class VedicAstrologerBot:
                 
         gana, yoni = self._get_gana_yoni(user_nak)
         self.user_stats = {"Name": name, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni}
-        self.chart_summary = "\n".join(results)
+        self.chart_summary = "\\n".join(results)
 
     def ask_ai(self, question, lang):
         prompt = f'''
-        You are a divine Vedic Astrologer.
+        You are "TaraVaani" (Voice of the Stars), a divine Vedic Astrologer AI.
         USER IDENTITY: {self.user_stats}
         CHART DATA: {self.chart_summary}
         
         INSTRUCTIONS:
-        1. Start with "Radhe Radhe {self.user_stats['Name']} 🙏"
+        1. Start with "Namaste {self.user_stats['Name']} 🙏"
         2. Speak ONLY in {lang}.
-        3. Use the Chart Data to answer.
-        4. Keep it under 150 words.
+        3. Use the Chart Data to answer accurately.
+        4. Keep it mystical but clear.
         '''
-        response = self.model.generate_content(prompt + "\nUSER QUESTION: " + question)
+        response = self.model.generate_content(prompt + "\\nUSER QUESTION: " + question)
         return response.text
 
 # --- FRONTEND UI ---
-st.set_page_config(page_title="Vedic AI Astrologer", page_icon="🕉️")
-
-st.title("🕉️ Vedic AI Astrologer")
-st.caption("Accurate Vedic Engine (Lahiri Ayanamsa)")
+# Title & Description Update
+st.title("🔮 TaraVaani")
+st.markdown("### Your AI astrology companion — Vedic insights in 9 Indian languages")
+st.caption("Powered by Lahiri Ayanamsa | Precise Calculation")
 
 with st.sidebar:
     st.header("Janma Kundali Details")
@@ -132,11 +139,11 @@ with st.sidebar:
     
     if st.button("Generate Kundali"):
         if SERVER_API_KEY:
-            with st.spinner("Calculating Vedic Positions..."):
+            with st.spinner("Aligning the stars..."):
                 bot = VedicAstrologerBot(SERVER_API_KEY)
                 bot.calculate_chart(name, dob, tob, 22.57, 88.36)
                 st.session_state['bot'] = bot
-                st.success("✅ Kundali Verified")
+                st.success("✅ Kundali Generated")
                 st.markdown(f'''
                 | **Attribute** | **Value** |
                 | :--- | :--- |
@@ -157,14 +164,14 @@ for msg in st.session_state['messages']:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if prompt := st.chat_input(f"Ask a question in {lang}..."):
+if prompt := st.chat_input(f"Ask TaraVaani in {lang}..."):
     st.session_state['messages'].append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
     
     if 'bot' in st.session_state:
         with st.chat_message("assistant"):
-            with st.spinner("Consulting the stars..."):
+            with st.spinner("Reading the celestial map..."):
                 response = st.session_state['bot'].ask_ai(prompt, lang)
                 st.markdown(response)
                 st.session_state['messages'].append({"role": "assistant", "content": response})

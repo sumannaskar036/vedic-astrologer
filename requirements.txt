@@ -1,5 +1,6 @@
 streamlit
 firebase-admin
+openai>=1.0.0
 pyswisseph
 opencage
 requests

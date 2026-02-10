@@ -223,7 +223,6 @@ Style: Mystic, positive, clear. Use bullet points.
 """
 
         url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent"
-"
 
         payload = {
             "contents": [{

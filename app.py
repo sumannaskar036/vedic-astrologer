@@ -3,39 +3,42 @@ import google.generativeai as genai
 import swisseph as swe
 import datetime
 import time
-from geopy.geocoders import Nominatim
-from geopy.exc import GeopyError
+from opencage.geocoder import OpenCageGeocode # Highly reliable API
 
 # --- 1. CONFIGURATION ---
-st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="centered")
+st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# --- 2. THE RELIABLE GEOCODER ---
-def get_coords_reliable(city_name):
-    """Attempt geocoding with different agents to bypass server blocks."""
-    # List of unique user agents to try
-    agents = ["taravaani_official_2026", "astro_engine_v1", "suman_naskar_app_99"]
-    
-    for agent in agents:
-        try:
-            geolocator = Nominatim(user_agent=agent, timeout=10)
-            location = geolocator.geocode(city_name)
-            if location:
-                return location
-        except:
-            time.sleep(1) # Brief pause before trying next agent
-            continue
+# --- 2. SESSION STATE (The Brain) ---
+# This persists your family data even when you click buttons
+if 'profiles' not in st.session_state:
+    st.session_state.profiles = [] # List to store Mother, Brother, etc.
+if 'current_data' not in st.session_state:
+    st.session_state.current_data = None
+
+# --- 3. RELIABLE GEOCODER (OpenCage) ---
+def get_coords(city_name):
+    """Uses OpenCage API for 100% reliable city searching."""
+    try:
+        # Get key from st.secrets
+        key = st.secrets["OPENCAGE_API_KEY"]
+        geocoder = OpenCageGeocode(key)
+        results = geocoder.geocode(city_name)
+        if results and len(results):
+            return results[0]['geometry']['lat'], results[0]['geometry']['lng']
+    except Exception as e:
+        st.error(f"Geocoding Error: {e}")
     return None
 
-# --- SECURITY: Get Paid Tier Key ---
+# --- SECURITY: Get Paid Tier AI Key ---
 try:
     SERVER_API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=SERVER_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
 except:
-    st.error("Secrets not found. Ensure GEMINI_API_KEY is in Streamlit Cloud Settings.")
+    st.error("Missing GEMINI_API_KEY in Secrets.")
     st.stop()
 
-# --- 3. ASTROLOGY ENGINE (Functions) ---
+# --- 4. ASTROLOGY ENGINE (Core Functions) ---
 def get_gana_yoni(nakshatra_name):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nakshatra_name, ("Unknown", "Unknown"))
@@ -43,7 +46,6 @@ def get_gana_yoni(nakshatra_name):
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     local_dt = datetime.datetime.combine(dt, tm)
-    # Note: Using IST (+5:30). 
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
@@ -62,46 +64,54 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     gana, yoni = get_gana_yoni(user_nak)
     return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)}
 
-# --- 4. SIDEBAR ---
+# --- 5. SIDEBAR (Profiles & Inputs) ---
 with st.sidebar:
-    st.header("👤 Birth Details")
-    name = st.text_input("Full Name", placeholder="Enter name")
-    gender = st.selectbox("Gender", ["Male", "Female", "Other"])
-    
-    # FORMAT: DD/MM/YYYY and range fix
-    dob = st.date_input(
-        "Date of Birth", 
-        value=datetime.date(1993, 4, 23), 
-        min_value=datetime.date(1900, 1, 1), 
-        max_value=datetime.date.today(),
-        format="DD/MM/YYYY" 
-    )
+    st.header("🗂 Profiles")
+    # Multi-Profile Selection
+    if st.session_state.profiles:
+        profile_names = [p['Name'] for p in st.session_state.profiles]
+        selected = st.selectbox("Select Saved Profile", ["Create New..."] + profile_names)
+    else:
+        selected = "Create New..."
+
+    st.divider()
+    st.header("👤 Add Birth Details")
+    name_in = st.text_input("Full Name")
+    gender_in = st.selectbox("Gender", ["Male", "Female", "Other"])
+    dob_in = st.date_input("Date of Birth", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900, 1, 1), format="DD/MM/YYYY")
     
     c1, c2 = st.columns(2)
-    with c1: hour = st.selectbox("Hour", range(0, 24), index=15)
-    with c2: minute = st.selectbox("Minute", range(0, 60), index=45)
-    tob = datetime.time(hour, minute)
+    with c1: hour_in = st.selectbox("Hour", range(24), index=15)
+    with c2: min_in = st.selectbox("Minute", range(60), index=45)
+    tob_in = datetime.time(hour_in, min_in)
     
-    city_input = st.text_input("Birth City", "Kolkata, India")
+    city_in = st.text_input("Birth City", "Kolkata, India")
     
-    if st.button("✨ Generate My Destiny", type="primary"):
-        if not name:
-            st.error("Please enter a name.")
-        else:
-            with st.spinner("Connecting to celestial coordinates..."):
-                location = get_coords_reliable(city_input)
-                if location:
-                    chart_data = calculate_vedic_chart(name, gender, dob, tob, location.latitude, location.longitude, city_input)
-                    st.session_state.app_state = {'generated': True, 'data': chart_data}
-                    st.rerun()
-                else:
-                    st.error("📍 Location server is busy. Please wait 10 seconds and try clicking the button again.")
+    if st.button("✨ Save & Generate", type="primary"):
+        with st.spinner("Geocoding & Calculating..."):
+            coords = get_coords(city_in)
+            if coords:
+                chart_data = calculate_vedic_chart(name_in, gender_in, dob_in, tob_in, coords[0], coords[1], city_in)
+                st.session_state.profiles.append(chart_data) # Save to session
+                st.session_state.current_data = chart_data
+                st.rerun()
+            else:
+                st.error("Could not find city. Check spelling.")
 
-# --- 5. MAIN UI ---
+# --- 6. MAIN UI ---
 st.title("☸️ TaraVaani")
-if st.session_state.get('app_state', {}).get('generated'):
-    data = st.session_state.app_state['data']
-    st.success(f"Radhe Radhe! {data['Name']}'s chart is ready. 🙏")
-    st.markdown(f"| **Lagna** | **Rashi** | **Nakshatra** | **Gana** | **Yoni** |\n| :--- | :--- | :--- | :--- | :--- |\n| {data['Lagna']} | {data['Rashi']} | {data['Nakshatra']} | {data['Gana']} | {data['Yoni']} |")
+if st.session_state.current_data:
+    data = st.session_state.current_data
+    st.success(f"Radhe Radhe! {data['Name']}'s chart is active. 🙏")
+    
+    # Beautiful Data Table
+    cols = st.columns(5)
+    fields = ["Lagna", "Rashi", "Nakshatra", "Gana", "Yoni"]
+    for i, field in enumerate(fields):
+        cols[i].metric(field, data[field])
+    
+    st.divider()
+    st.subheader("📜 Planetary Positions")
+    st.text(data['Full_Chart'])
 else:
-    st.info("👈 Enter birth details in the sidebar to start your journey.")
+    st.info("👈 Enter birth details in the sidebar and click 'Save & Generate' to begin.")

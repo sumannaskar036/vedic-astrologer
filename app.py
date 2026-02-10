@@ -39,10 +39,6 @@ except:
     st.stop()
 
 # --- 4. ASTROLOGY ENGINE (Core Functions) ---
-def get_gana_yoni(nakshatra_name):
-    data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
-    return data.get(nakshatra_name, ("Unknown", "Unknown"))
-
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     # 1. INITIALIZE VEDIC ENGINE
     swe.set_sid_mode(swe.SIDM_LAHIRI)
@@ -53,14 +49,13 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # 3. GET THE AYANAMSA (The secret to shifting from Aquarius to Capricorn)
-    # This value is approx 23.4 degrees for 1969
+    # 3. CALCULATE THE EXACT AYANAMSA (The secret to shifting from Aquarius to Capricorn)
     ayanamsa = swe.get_ayanamsa_ut(jd)
     
-    # 4. CALCULATE HOUSES (Tropical first)
+    # 4. CALCULATE HOUSES (Get Tropical first, then shift manually)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     
-    # 5. MANUALLY SHIFT TO SIDEREAL (The Absolute Fix)
+    # 5. MANUALLY SHIFT ASCENDANT TO SIDEREAL (The Absolute Fix)
     # (Tropical Ascendant - Ayanamsa) = Vedic Ascendant
     asc_sidereal = (ascmc[0] - ayanamsa) % 360
     
@@ -79,6 +74,20 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
+    for p, pid in planet_map.items():
+        # Get planetary position using the sidereal flag
+        pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
+        if p == "Ketu": pos = (pos + 180) % 360
+        
+        sign = zodiac[int(pos // 30)]
+        nak = nak_list[int(pos / (360/27))]
+        results.append(f"{p}: {sign} ({pos % 30:.2f}°) | {nak}")
+        
+        if p == "Moon":
+            user_rashi, user_nak = sign, nak
+            
+    gana, yoni = get_gana_yoni(user_nak)
+    return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)}
     for p, pid in planet_map.items():
         # Get planetary position using the sidereal flag
         pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]

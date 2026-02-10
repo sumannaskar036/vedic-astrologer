@@ -53,7 +53,7 @@ def get_gana_yoni(nak):
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
-    # --- AYANAMSA SELECTION (Fixed logic using Integers) ---
+    # --- AYANAMSA SELECTION ---
     if "Lahiri" in ayanamsa_mode:
         swe.set_sid_mode(swe.SIDM_LAHIRI)
     elif "Raman" in ayanamsa_mode:
@@ -81,7 +81,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
-    # Use Moshier flag for stability
+    # Use Moshier flag for stability (No files needed)
     CALC_FLAG = swe.FLG_SIDEREAL | swe.FLG_MOSEPH
     
     for p, pid in planet_map.items():
@@ -183,7 +183,7 @@ if st.session_state.get('current_data'):
     
     st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
     
-    # --- Columns defined cleanly here ---
+    # --- Metrics ---
     col1, col2, col3, col4, col5 = st.columns(5)
     
     col1.metric("Lagna", d['Lagna'])
@@ -195,5 +195,47 @@ if st.session_state.get('current_data'):
     st.divider()
     st.subheader("📜 Planetary Degrees")
     st.code(d['Full_Chart'], language="text")
+
+    # --- 8. AI PREDICTION ENGINE (INSERTED HERE) ---
+    st.divider()
+    st.subheader("🤖 Ask TaraVaani (AI Astrologer)")
+    
+    question = st.selectbox(
+        "Select a topic:",
+        [
+            "General Life Overview",
+            "Career & Success",
+            "Marriage & Relationships",
+            "Health & Vitality",
+            "Wealth & Finance"
+        ]
+    )
+    
+    if st.button("✨ Get Prediction"):
+        # Create a prompt for the AI
+        prompt = f"""
+        Act as an expert Vedic Astrologer named 'TaraVaani'.
+        Analyze this birth chart for {d['Name']} ({d['Gender']}):
+        
+        - Lagna (Ascendant): {d['Lagna']}
+        - Moon Sign (Rashi): {d['Rashi']}
+        - Nakshatra: {d['Nakshatra']}
+        - Planetary Positions:
+        {d['Full_Chart']}
+        
+        Task: Provide a detailed insight about "{question}".
+        Tone: Empathetic, spiritual, yet practical and honest.
+        Structure: Use bullet points and bold text for clarity. Keep it under 200 words.
+        """
+        
+        # Call Gemini AI
+        with st.spinner("Consulting the stars..."):
+            try:
+                response = model.generate_content(prompt)
+                st.markdown("### 🔮 TaraVaani Says:")
+                st.write(response.text)
+            except Exception as e:
+                st.error(f"AI Error: {e}")
+
 else:
     st.info("👈 Please enter birth details in the sidebar.")

@@ -7,28 +7,18 @@ from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
 
 # --- 1. CONFIGURATION ---
-st.set_page_config(page_title="TaraVaani Chat", page_icon="☸️", layout="wide")
+st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Clean, Minimal Dark Theme
-st.markdown("""
-<style>
-    .stApp { background-color: #0E1117; color: #E0E0E0; }
-    .stChatInput { position: fixed; bottom: 0; padding-bottom: 20px; }
-    /* Hide default menu */
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-</style>
-""", unsafe_allow_html=True)
-
-# --- 2. SETUP BACKEND ---
-# Firebase
+# --- 2. FIREBASE CONNECTION ---
 if not firebase_admin._apps:
     try:
-        raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"].replace("\\n", "\n")
-        cred = credentials.Certificate({
+        raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"]
+        fixed_key = raw_key.replace("\\n", "\n")
+        cred_info = {
             "type": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["type"],
             "project_id": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["project_id"],
             "private_key_id": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key_id"],
-            "private_key": raw_key,
+            "private_key": fixed_key,
             "client_email": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["client_email"],
             "client_id": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["client_id"],
             "auth_uri": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["auth_uri"],
@@ -36,115 +26,216 @@ if not firebase_admin._apps:
             "auth_provider_x509_cert_url": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["auth_provider_x509_cert_url"],
             "client_x509_cert_url": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["client_x509_cert_url"],
             "universe_domain": "googleapis.com"
-        })
+        }
+        cred = credentials.Certificate(cred_info)
         firebase_admin.initialize_app(cred)
-    except: pass
+    except Exception as e:
+        st.error(f"Database Error: {e}")
+        st.stop()
 
 db = firestore.client()
 
-# AI & Geocoding
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except: pass
+# --- 3. API SETUP ---
 try:
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
-except: pass
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except:
+    st.warning("⚠️ Checking API Keys...")
 
-# --- 3. SESSION STATE ---
-if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Namaste! I am TaraVaani. Please enter your birth details in the sidebar so I can read your chart."}]
-if "chart_context" not in st.session_state: st.session_state.chart_context = None
+# --- 4. SESSION STATE ---
+if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin" 
+if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-# --- 4. CALCULATION ENGINE ---
-def calculate_chart(name, dt, tm, city):
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
-    try:
-        res = geocoder.geocode(city)
-        lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
-    except: lat, lng = 28.61, 77.20 # Default Delhi
+# --- 5. ASTROLOGY ENGINE ---
+def get_gana_yoni(nak):
+    data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
+    return data.get(nak, ("Unknown", "Unknown"))
+
+def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
+    # --- AYANAMSA SELECTION ---
+    if "Lahiri" in ayanamsa_mode:
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+    elif "Raman" in ayanamsa_mode:
+        swe.set_sid_mode(swe.SIDM_RAMAN)
+    elif "KP" in ayanamsa_mode:
+        swe.set_sid_mode(5) # Integer 5 represents KP New
     
+    # 1. Time Conversion
     birth_dt = datetime.datetime.combine(dt, tm)
-    # Convert to UTC (Assuming Input is IST for simplicity, or handle TZ)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # Planets
-    planet_map = {0:"Sun", 1:"Moon", 4:"Mars", 2:"Mercury", 5:"Jupiter", 3:"Venus", 6:"Saturn", 11:"Rahu"}
-    zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    
-    # Lagna
+    # 2. Calculate Ascendant
     ayanamsa = swe.get_ayanamsa_ut(jd)
-    cusps, ascmc = swe.houses(jd, lat, lng, b'P')
+    cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     asc_deg = (ascmc[0] - ayanamsa) % 360
-    lagna = zodiac[int(asc_deg // 30)]
     
-    chart_data = f"Name: {name}\nBirth: {dt} {tm}\nCity: {city}\nLagna (Ascendant): {lagna}\n"
+    zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+    lagna_sign = zodiac[int(asc_deg // 30)]
+    lagna_val = asc_deg % 30
     
-    for pid, pname in planet_map.items():
+    # 3. Calculate Planets (Crash-Proof)
+    planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
+    results = []
+    user_rashi, user_nak = "", ""
+    nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
+
+    # Use Moshier flag for stability (No files needed)
+    CALC_FLAG = swe.FLG_SIDEREAL | swe.FLG_MOSEPH
+    
+    for p, pid in planet_map.items():
         try:
-            pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL | swe.FLG_MOSEPH)[0][0]
+            pos = swe.calc_ut(jd, pid, CALC_FLAG)[0][0]
             sign = zodiac[int(pos // 30) % 12]
             deg = pos % 30
-            chart_data += f"{pname}: {sign} ({deg:.2f}°)\n"
-        except: pass
-        
-    return chart_data
+            nak_idx = int(pos / (360/27)) % 27
+            nak = nak_list[nak_idx]
+            results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
+            if p == "Moon": user_rashi, user_nak = sign, nak
+        except:
+            results.append(f"{p}: Error")
 
-# --- 5. SIDEBAR (INPUTS) ---
-with st.sidebar:
-    st.header("📝 Birth Details")
-    name = st.text_input("Name")
-    dob = st.date_input("Date of Birth", value=datetime.date(1995,1,1), min_value=datetime.date(1900,1,1), max_value=datetime.date(2100,12,31))
-    t_time = st.time_input("Time of Birth", value=datetime.time(10,30))
-    city = st.text_input("City", "New Delhi, India")
+    gana, yoni = get_gana_yoni(user_nak)
     
-    if st.button("Generate Kundali", type="primary"):
-        with st.spinner("Calculating Planetary Positions..."):
-            chart_text = calculate_chart(name, dob, t_time, city)
-            st.session_state.chart_context = chart_text
-            st.session_state.messages.append({"role": "assistant", "content": f"I have generated the chart for **{name}**. You can now ask me anything about your career, marriage, or health!"})
-            st.success("Chart Ready!")
+    return {
+        "Name": name, "Gender": gender,
+        "Lagna": lagna_sign, "Lagna_Deg": f"{lagna_val:.2f}",
+        "Rashi": user_rashi, "Nakshatra": user_nak,
+        "Gana": gana, "Yoni": yoni, "City": city,
+        "Full_Chart": "\n".join(results)
+    }
 
-# --- 6. MAIN CHAT INTERFACE ---
-st.title("☸️ TaraVaani Chat")
+# --- 6. SIDEBAR ---
+with st.sidebar:
+    st.title("☸️ TaraVaani")
+    
+    st.header("Create Profile")
+    n_in = st.text_input("Full Name")
+    g_in = st.selectbox("Gender", ["Male", "Female"])
+    
+    # Date Range: 1900 - 2025
+    d_in = st.date_input(
+        "Date of Birth", 
+        value=datetime.date(1993, 4, 23), 
+        min_value=datetime.date(1900, 1, 1), 
+        max_value=datetime.date(2025, 12, 31),
+        format="DD/MM/YYYY"
+    )
+    
+    c1, c2 = st.columns(2)
+    with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=4)
+    with c2: mn_in = st.selectbox("Minute", range(60), index=30)
+    
+    city_in = st.text_input("Birth City", value="Kolkata, India")
 
-# Display Chat History
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    st.divider()
+    
+    # --- AYANAMSA SETTINGS ---
+    with st.expander("⚙️ Advanced Settings"):
+        st.caption("Change calculation system if your chart differs.")
+        ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
+    
+    if st.button("🔮 Generate Kundali"):
+        with st.spinner("Calculating..."):
+            res = geocoder.geocode(city_in)
+            if res:
+                lat = res[0]['geometry']['lat']
+                lng = res[0]['geometry']['lng']
+                formatted_city = res[0]['formatted']
+                
+                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city, ayanamsa_opt)
+                
+                try:
+                    user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+                    user_ref.document(n_in).set(chart)
+                except: pass
+                
+                st.session_state.current_data = chart
+                st.rerun()
+            else:
+                st.error("City not found.")
 
-# Chat Input & Logic
-if prompt := st.chat_input("Ask about your future..."):
-    # 1. Show User Message
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    st.divider()
+    
+    # Load Profile
+    try:
+        user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+        profiles = [doc.to_dict() for doc in user_ref.stream()]
+    except: profiles = []
 
-    # 2. Generate AI Response
-    with st.chat_message("assistant"):
-        if st.session_state.chart_context:
+    if profiles:
+        st.subheader("📂 Saved Profiles")
+        selected_prof = st.selectbox("Select", [p['Name'] for p in profiles])
+        if st.button("Load"):
+            found = next((p for p in profiles if p['Name'] == selected_prof), None)
+            if found: st.session_state.current_data = found
+
+# --- 7. MAIN UI ---
+st.markdown("""
+<style>
+.header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; font-size: 18px; font-weight: bold; margin-bottom: 20px; }
+</style>
+""", unsafe_allow_html=True)
+
+if st.session_state.get('current_data'):
+    d = st.session_state.current_data
+    
+    st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
+    
+    # --- Metrics ---
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    col1.metric("Lagna", d['Lagna'])
+    col2.metric("Rashi", d['Rashi'])
+    col3.metric("Nakshatra", d['Nakshatra'])
+    col4.metric("Gana", d['Gana'])
+    col5.metric("Yoni", d['Yoni'])
+    
+    st.divider()
+    st.subheader("📜 Planetary Degrees")
+    st.code(d['Full_Chart'], language="text")
+
+    # --- 8. AI PREDICTION ENGINE (INSERTED HERE) ---
+    st.divider()
+    st.subheader("🤖 Ask TaraVaani (AI Astrologer)")
+    
+    question = st.selectbox(
+        "Select a topic:",
+        [
+            "General Life Overview",
+            "Career & Success",
+            "Marriage & Relationships",
+            "Health & Vitality",
+            "Wealth & Finance"
+        ]
+    )
+    
+    if st.button("✨ Get Prediction"):
+        # Create a prompt for the AI
+        prompt = f"""
+        Act as an expert Vedic Astrologer named 'TaraVaani'.
+        Analyze this birth chart for {d['Name']} ({d['Gender']}):
+        
+        - Lagna (Ascendant): {d['Lagna']}
+        - Moon Sign (Rashi): {d['Rashi']}
+        - Nakshatra: {d['Nakshatra']}
+        - Planetary Positions:
+        {d['Full_Chart']}
+        
+        Task: Provide a detailed insight about "{question}".
+        Tone: Empathetic, spiritual, yet practical and honest.
+        Structure: Use bullet points and bold text for clarity. Keep it under 200 words.
+        """
+        
+        # Call Gemini AI
+        with st.spinner("Consulting the stars..."):
             try:
-                # Construct the Prompt
-                full_prompt = f"""
-                You are TaraVaani, an expert Vedic Astrologer. 
-                Here is the user's birth chart details:
-                {st.session_state.chart_context}
-                
-                User Question: {prompt}
-                
-                Answer based strictly on Vedic Astrology principles. Be helpful, mystical but practical. Keep it under 200 words.
-                """
-                
-                # Call Gemini
-                response = model.generate_content(full_prompt)
-                bot_reply = response.text
-                
-                st.markdown(bot_reply)
-                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-            
+                response = model.generate_content(prompt)
+                st.markdown("### 🔮 TaraVaani Says:")
+                st.write(response.text)
             except Exception as e:
-                st.error(f"AI Connection Error: {str(e)}")
-                st.info("Check if your GEMINI_API_KEY is correct in Streamlit Secrets.")
-        else:
-            st.warning("Please generate your Kundali in the sidebar first!")
+                st.error(f"AI Error: {e}")
+
+else:
+    st.info("👈 Please enter birth details in the sidebar.")

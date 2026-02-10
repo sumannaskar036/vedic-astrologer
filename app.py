@@ -44,23 +44,44 @@ def get_gana_yoni(nakshatra_name):
     return data.get(nakshatra_name, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
+    # 1. SET NIRAYANA (VEDIC) MODE
     swe.set_sid_mode(swe.SIDM_LAHIRI)
+    
+    # 2. CONVERT TO JULIAN DAY
     local_dt = datetime.datetime.combine(dt, tm)
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
-    cusps, ascmc = swe.houses(jd, lat, lon, b'P')
-    asc_vedic = (ascmc[0] - swe.get_ayanamsa_ut(jd)) % 360
-    zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    nakshatras = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
-    lagna_sign = zodiac[int(asc_vedic // 30)]
-    planet_map = {"Sun": swe.SUN, "Moon": swe.MOON, "Mars": swe.MARS, "Mercury": swe.MERCURY, "Jupiter": swe.JUPITER, "Venus": swe.VENUS, "Saturn": swe.SATURN, "Rahu": swe.MEAN_NODE, "Ketu": swe.MEAN_NODE}
+    
+    # 3. CALCULATE SIDEREAL HOUSES (The Fix for Capricorn)
+    # Using the specific Sidereal Flag (65536) ensures math starts from Vedic 0°
+    SEFLG_SIDEREAL = 64 * 1024 
+    cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P', SEFLG_SIDEREAL)
+    
+    asc_degree = ascmc[0]
+    zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", 
+              "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+    lagna_sign = zodiac[int(asc_degree // 30)]
+    
+    # 4. PLANETARY POSITIONS (Force Sidereal)
+    planet_map = {"Sun": swe.SUN, "Moon": swe.MOON, "Mars": swe.MARS, "Mercury": swe.MERCURY, 
+                  "Jupiter": swe.JUPITER, "Venus": swe.VENUS, "Saturn": swe.SATURN, 
+                  "Rahu": swe.MEAN_NODE, "Ketu": swe.MEAN_NODE}
+    
     results = []
     user_rashi, user_nak = "", ""
+    nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
+
     for p, pid in planet_map.items():
-        pos = (swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)[0][0]) if p != "Ketu" else (swe.calc_ut(jd, swe.MEAN_NODE, swe.FLG_SIDEREAL)[0][0] + 180) % 360
-        sign, nak, degree = zodiac[int(pos // 30)], nakshatras[int(pos / (360/27))], pos % 30
-        results.append(f"{p}: {sign} ({degree:.2f}°) | {nak}")
-        if p == "Moon": user_rashi, user_nak = sign, nak
+        pos = swe.calc_ut(jd, pid, SEFLG_SIDEREAL)[0][0]
+        if p == "Ketu": pos = (pos + 180) % 360
+        
+        sign = zodiac[int(pos // 30)]
+        nak = nak_list[int(pos / (360/27))]
+        results.append(f"{p}: {sign} ({pos % 30:.2f}°) | {nak}")
+        
+        if p == "Moon":
+            user_rashi, user_nak = sign, nak
+            
     gana, yoni = get_gana_yoni(user_nak)
     return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)}
 

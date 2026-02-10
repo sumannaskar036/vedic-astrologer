@@ -89,6 +89,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)}
 
 # --- 6. SIDEBAR: UI DESIGN ---
+# --- 6. SIDEBAR: UI DESIGN ---
 with st.sidebar:
     st.header("✨ Create Profile")
     
@@ -109,29 +110,36 @@ with st.sidebar:
     with c2:
         mn_in = st.selectbox("Minute", range(60), index=45)
     
-    # 4. Location: Dropdown Style
-    # We pre-fill popular cities, but user can type freely
-    popular_cities = ["Kolkata, India", "Mumbai, India", "Delhi, India", "Bangalore, India", "Chennai, India", "London, UK", "New York, USA"]
-    city_in = st.selectbox("Birth City", popular_cities + ["Other (Type Below)"])
-    
-    if city_in == "Other (Type Below)":
-        city_in = st.text_input("Enter City Name")
-    
+    # 4. Location: Smart Text Input (Fixes "Diamond Harbour" issue)
+    city_in = st.text_input("Birth City", 
+                            value="Kolkata, India", 
+                            help="Type any city (e.g., Diamond Harbour, Canning, Howrah)")
+
     # 5. The "Generate Kundali" Button
     if st.button("🔮 Generate Kundali"):
         with st.spinner("Calculating Planetary Positions..."):
+            # The geocoder will now find ANY city you typed
             res = geocoder.geocode(city_in)
+            
             if res:
-                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), res[0]['geometry']['lat'], res[0]['geometry']['lng'], city_in)
+                # Get precise coordinates
+                lat = res[0]['geometry']['lat']
+                lng = res[0]['geometry']['lng']
+                formatted_city = res[0]['formatted'] # Use the official name found (e.g., "Diamond Harbour, West Bengal")
                 
-                # Save to Firebase silently in the background
-                user_profiles_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
-                user_profiles_ref.document(n_in).set(chart)
+                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
+                
+                # Save to Firebase silently
+                try:
+                    user_profiles_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+                    user_profiles_ref.document(n_in).set(chart)
+                except Exception as e:
+                    st.warning(f"Could not save to history: {e}")
                 
                 st.session_state.current_data = chart
                 st.rerun()
             else:
-                st.error("City not found! Please check spelling.")
+                st.error(f"📍 Could not find '{city_in}'. Please check the spelling.")
 
     st.divider()
     

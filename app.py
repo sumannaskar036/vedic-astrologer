@@ -7,23 +7,20 @@ from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
 import json
 
-# --- 1. GLOBAL CONFIG (Must be first) ---
+# --- 1. GLOBAL CONFIG ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# --- 2. HARDENED FIREBASE BRIDGE (With Auto-Fix) ---
+# --- 2. FIREBASE BRIDGE (With Auto-Fix) ---
 if not firebase_admin._apps:
     try:
-        # Retrieve the key from secrets
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"]
-        
-        # --- THE FIX: Automatically convert literal \n to actual newlines ---
         fixed_key = raw_key.replace("\\n", "\n")
         
         cred_info = {
             "type": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["type"],
             "project_id": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["project_id"],
             "private_key_id": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key_id"],
-            "private_key": fixed_key, # Use the fixed key here
+            "private_key": fixed_key,
             "client_email": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["client_email"],
             "client_id": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["client_id"],
             "auth_uri": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["auth_uri"],
@@ -32,16 +29,12 @@ if not firebase_admin._apps:
             "client_x509_cert_url": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["client_x509_cert_url"],
             "universe_domain": "googleapis.com"
         }
-        
         cred = credentials.Certificate(cred_info)
         firebase_admin.initialize_app(cred)
-        st.success("✅ Connected to Cloud Vault!") # Visual confirmation
-        
     except Exception as e:
-        st.error(f"Firebase Bridge Failure: {e}")
-        st.stop() # Stop the app gracefully if connection fails
+        st.error(f"Connection Error: {e}")
+        st.stop()
 
-# Initialize Firestore Client
 db = firestore.client()
 
 # --- 3. SESSION STATE ---
@@ -53,14 +46,14 @@ if 'current_data' not in st.session_state:
 
 # --- 4. ENGINES ---
 try:
+    # Use OpenCage for "smart search" to simulate a dropdown experience
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 except:
     st.warning("⚠️ Checking API Keys...")
 
-# --- 5. ASTROLOGY ENGINE (Pure Vedic) ---
-
+# --- 5. ASTROLOGY ENGINE ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
@@ -95,60 +88,84 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     gana, yoni = get_gana_yoni(user_nak)
     return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)}
 
-# --- 6. SIDEBAR: SaaS STORAGE ---
+# --- 6. SIDEBAR: UI DESIGN ---
 with st.sidebar:
-    st.header("👤 Cloud Vault")
+    st.header("✨ Create Profile")
     
-    # Fetch ONLY this user's profiles
-    # We use a try-block here in case the database is empty initially
+    # 1. Name & Gender
+    n_in = st.text_input("Full Name")
+    g_in = st.selectbox("Gender", ["Male", "Female"])
+    
+    # 2. Date: Start from 1900
+    d_in = st.date_input("Date of Birth", 
+                         value=datetime.date(1993, 4, 23), 
+                         min_value=datetime.date(1900, 1, 1),
+                         format="DD/MM/YYYY")
+    
+    # 3. Time: Side-by-Side
+    c1, c2 = st.columns(2)
+    with c1:
+        hr_in = st.selectbox("Hour (24h)", range(24), index=15)
+    with c2:
+        mn_in = st.selectbox("Minute", range(60), index=45)
+    
+    # 4. Location: Dropdown Style
+    # We pre-fill popular cities, but user can type freely
+    popular_cities = ["Kolkata, India", "Mumbai, India", "Delhi, India", "Bangalore, India", "Chennai, India", "London, UK", "New York, USA"]
+    city_in = st.selectbox("Birth City", popular_cities + ["Other (Type Below)"])
+    
+    if city_in == "Other (Type Below)":
+        city_in = st.text_input("Enter City Name")
+    
+    # 5. The "Generate Kundali" Button
+    if st.button("🔮 Generate Kundali"):
+        with st.spinner("Calculating Planetary Positions..."):
+            res = geocoder.geocode(city_in)
+            if res:
+                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), res[0]['geometry']['lat'], res[0]['geometry']['lng'], city_in)
+                
+                # Save to Firebase silently in the background
+                user_profiles_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+                user_profiles_ref.document(n_in).set(chart)
+                
+                st.session_state.current_data = chart
+                st.rerun()
+            else:
+                st.error("City not found! Please check spelling.")
+
+    st.divider()
+    
+    # Saved Profiles Section
+    st.subheader("📂 Saved Profiles")
     try:
         user_profiles_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
         docs = user_profiles_ref.stream()
         profiles = [doc.to_dict() for doc in docs]
-    except Exception as e:
+    except:
         profiles = []
-        st.warning("Database syncing...")
-    
+
     if profiles:
         selected = st.selectbox("Load Profile", [p['Name'] for p in profiles])
-        if st.button("Activate"):
+        if st.button("Load"):
             st.session_state.current_data = next(p for p in profiles if p['Name'] == selected)
 
-    st.divider()
-    n_in = st.text_input("Full Name")
-    g_in = st.selectbox("Gender", ["Male", "Female"])
-    d_in = st.date_input("DOB", value=datetime.date(1993, 4, 23), format="DD/MM/YYYY")
-    hr_in = st.selectbox("Hour", range(24), index=15)
-    mn_in = st.selectbox("Min", range(60), index=45)
-    city_in = st.text_input("City", "Kolkata, India")
-    
-    if st.button("✨ Save Forever"):
-        with st.spinner("Connecting to stars..."):
-            res = geocoder.geocode(city_in)
-            if res:
-                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), res[0]['geometry']['lat'], res[0]['geometry']['lng'], city_in)
-                # Save to specific User ID Silo
-                user_profiles_ref.document(n_in).set(chart)
-                st.session_state.current_data = chart
-                st.rerun()
-
-# --- 7. MAIN UI ---
+# --- 7. MAIN DASHBOARD ---
 st.title("☸️ TaraVaani")
-
-# Connection Status Indicator
-if firebase_admin._apps:
-    st.caption("🟢 System Online: Cloud Database Connected")
 
 if st.session_state.get('current_data'):
     d = st.session_state.current_data
-    st.success(f"Viewing: {d['Name']} 🙏")
+    st.success(f"Janma Kundali: {d['Name']} 🙏")
     
+    # Key Metrics Row
     cols = st.columns(5)
-    for i, field in enumerate(["Lagna", "Rashi", "Nakshatra", "Gana", "Yoni"]):
-        cols[i].metric(field, d[field])
+    cols[0].metric("Lagna (Ascendant)", d['Lagna'])
+    cols[1].metric("Rashi (Moon Sign)", d['Rashi'])
+    cols[2].metric("Nakshatra", d['Nakshatra'])
+    cols[3].metric("Gana", d['Gana'])
+    cols[4].metric("Yoni", d['Yoni'])
     
     st.divider()
-    st.subheader("📜 Planetary Positions")
-    st.text(d['Full_Chart'])
+    st.subheader("📜 Graha Spashta (Planetary Degrees)")
+    st.code(d['Full_Chart'], language="text")
 else:
-    st.info("👈 Profiles saved here stay in your account forever!")
+    st.info("👈 Please enter birth details in the sidebar to generate a Kundali.")

@@ -9,7 +9,7 @@ import google.generativeai as genai
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS for UI
+# Custom CSS
 st.markdown("""
 <style>
     .header-box { 
@@ -23,6 +23,7 @@ st.markdown("""
         text-align: center;
     }
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
+    .stChatInput { position: fixed; bottom: 0; padding-bottom: 15px; z-index: 1000; background: #0E1117; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,7 +45,7 @@ if not firebase_admin._apps:
             "universe_domain": "googleapis.com"
         }
         firebase_admin.initialize_app(credentials.Certificate(cred_info))
-    except Exception as e:
+    except Exception as e: 
         pass
 
 db = firestore.client()
@@ -52,7 +53,7 @@ db = firestore.client()
 # --- 3. API SETUP ---
 try:
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
-except:
+except: 
     pass
 
 # --- 4. SESSION STATE ---
@@ -77,9 +78,12 @@ def get_gana_yoni(nak):
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
-    if "Lahiri" in ayanamsa_mode: swe.set_sid_mode(swe.SIDM_LAHIRI)
-    elif "Raman" in ayanamsa_mode: swe.set_sid_mode(swe.SIDM_RAMAN)
-    elif "KP" in ayanamsa_mode: swe.set_sid_mode(5) 
+    if "Lahiri" in ayanamsa_mode: 
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+    elif "Raman" in ayanamsa_mode: 
+        swe.set_sid_mode(swe.SIDM_RAMAN)
+    elif "KP" in ayanamsa_mode: 
+        swe.set_sid_mode(5) 
     
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
@@ -104,8 +108,9 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
             nak_idx = int(pos / (360/27)) % 27
             nak = nak_list[nak_idx]
             results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
-            if p == "Moon": user_rashi, user_nak = sign, nak
-        except:
+            if p == "Moon": 
+                user_rashi, user_nak = sign, nak
+        except: 
             results.append(f"{p}: Error")
 
     gana, yoni = get_gana_yoni(user_nak)
@@ -156,10 +161,12 @@ with st.sidebar:
                     lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
                     fmt_city = res[0]['formatted']
                     chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, fmt_city, ayanamsa_opt)
+                    
                     try:
                         db.collection("users").document(st.session_state.user_id).collection("profiles").document(n_in).set(chart)
                     except:
                         pass
+                    
                     st.session_state.current_data = chart
                     st.rerun()
                 else:
@@ -176,8 +183,8 @@ with st.sidebar:
         profiles = []
     
     if profiles:
-        sel_prof = st.selectbox("Select", [p['Name'] for p in profiles], label_visibility="collapsed")
-        if st.button("Load"):
+        sel_prof = st.selectbox("Select Profile", [p['Name'] for p in profiles], label_visibility="collapsed")
+        if st.button("Load Profile"):
             found = next((p for p in profiles if p['Name'] == sel_prof), None)
             if found:
                 st.session_state.current_data = found
@@ -221,25 +228,22 @@ if st.session_state.current_data:
         
         with st.spinner(f"Consulting stars in {lang_opt}..."):
             try:
-                # --- FORCED STABLE V1 IMPLEMENTATION ---
-                # Configuring to use REST transport and stable endpoint to avoid 404
-                genai.configure(
-                    api_key=st.secrets["GEMINI_API_KEY"],
-                    transport='rest'
-                )
+                # --- MANDATORY STABLE V1 FIX ---
+                # Bypasses the broken 'v1beta' URL by forcing REST and the full model path
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
                 
-                # Specifically using the stable version path
-                model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+                # Explicit model resource path required by stable v1 endpoint
+                model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
                 
                 response = model.generate_content(prompt)
                 
                 if response and response.text:
                     st.info(response.text)
                 else:
-                    st.warning("The stars are silent right now. Please try again.")
+                    st.warning("The stars are silent. Check Google Billing or Quota limits.")
                     
             except Exception as e:
-                st.error(f"Error consulting the stars: {e}")
+                st.error(f"Prediction Error: {e}")
 
 else:
     st.title("☸️ TaraVaani")

@@ -1,15 +1,16 @@
 import streamlit as st
-import google.generativeai as genai
 import swisseph as swe
 import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
+import requests
+import json
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS
+# Custom CSS for Green Header & Clean Look
 st.markdown("""
 <style>
     .header-box { 
@@ -23,6 +24,7 @@ st.markdown("""
         text-align: center;
     }
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
+    .stChatInput { position: fixed; bottom: 0; padding-bottom: 15px; z-index: 1000; background: #0E1117; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -48,17 +50,10 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- 3. API SETUP (STRICTLY FLASH) ---
+# --- 3. API SETUP ---
 try:
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    
-    # We LOCK this to Flash. 
-    # If this fails with 404, it means requirements.txt is missing/ignored.
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
-except Exception as e:
-    st.error(f"API Error: {e}")
+except: pass
 
 # --- 4. SESSION STATE ---
 if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin"
@@ -70,24 +65,20 @@ def get_gana_yoni(nak):
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
-    # 1. Ayanamsa
     if "Lahiri" in ayanamsa_mode: swe.set_sid_mode(swe.SIDM_LAHIRI)
     elif "Raman" in ayanamsa_mode: swe.set_sid_mode(swe.SIDM_RAMAN)
     elif "KP" in ayanamsa_mode: swe.set_sid_mode(5) 
     
-    # 2. Time
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # 3. Lagna
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     asc_deg = (ascmc[0] - ayanamsa) % 360
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
     lagna_sign = zodiac[int(asc_deg // 30)]
     
-    # 4. Planets
     planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
     results = []
     user_rashi, user_nak = "", ""
@@ -115,7 +106,6 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
 with st.sidebar:
     st.title("☸️ TaraVaani")
     
-    # Language Selector
     st.markdown("### 🗣️ AI Language")
     lang_opt = st.selectbox(
         "Select output language",
@@ -134,7 +124,7 @@ with st.sidebar:
         value=datetime.date(1993, 4, 23), 
         min_value=datetime.date(1900, 1, 1), 
         max_value=datetime.date(2025, 12, 31),
-        format="DD/MM/YYYY"  # <--- Added this to fix format
+        format="DD/MM/YYYY" 
     )
     
     c1, c2 = st.columns(2)
@@ -143,11 +133,9 @@ with st.sidebar:
     
     city_in = st.text_input("Birth City", value="Kolkata, India")
 
-    # Advanced Settings
     with st.expander("⚙️ Advanced Settings"):
         ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
     
-    # Generate Button
     if st.button("Generate Kundali", type="primary"):
         with st.spinner("Calculating..."):
             try:
@@ -158,7 +146,6 @@ with st.sidebar:
                     
                     chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, fmt_city, ayanamsa_opt)
                     
-                    # Firebase Save
                     try:
                         db.collection("users").document(st.session_state.user_id).collection("profiles").document(n_in).set(chart)
                     except: pass
@@ -170,7 +157,6 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    # Saved Profiles
     st.divider()
     st.subheader("📂 Saved Profiles")
     try:
@@ -184,14 +170,12 @@ with st.sidebar:
             found = next((p for p in profiles if p['Name'] == sel_prof), None)
             if found: st.session_state.current_data = found; st.rerun()
 
-# --- 7. MAIN UI ---
+# --- 7. MAIN UI (REST API VERSION) ---
 if st.session_state.current_data:
     d = st.session_state.current_data
     
-    # Header
     st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
     
-    # Metrics
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Lagna", d['Lagna'])
     c2.metric("Rashi", d['Rashi'])
@@ -200,21 +184,12 @@ if st.session_state.current_data:
     c5.metric("Yoni", d['Yoni'])
     
     st.divider()
-    
-    # Chart Data
     st.subheader("📜 Planetary Degrees")
     st.code(d['Full_Chart'], language="text")
-    
     st.divider()
 
-    # AI Chat Section
     st.subheader(f"🤖 Ask TaraVaani ({lang_opt})")
-    
-    # Topic Selector
-    q_topic = st.selectbox(
-        "Choose a Topic:",
-        ["General Life Overview", "Career & Success", "Marriage & Relationships", "Health & Vitality", "Wealth & Finance"]
-    )
+    q_topic = st.selectbox("Choose a Topic:", ["General Life Overview", "Career & Success", "Marriage & Relationships", "Health & Vitality", "Wealth & Finance"])
 
     if st.button("✨ Get Prediction"):
          prompt = f"""
@@ -227,20 +202,27 @@ if st.session_state.current_data:
         - Planets: {d['Full_Chart']}
         
         Question: Predict about {q_topic}.
-        
         IMPORTANT: Write response in {lang_opt} language.
         Style: Mystic, positive, clear. Use bullet points.
         """
          with st.spinner(f"Consulting stars in {lang_opt}..."):
             try:
-                response = model.generate_content(prompt)
-                st.info(response.text)
-            except Exception as e:
-                # Specific error message for the 404/Flash issue
-                if "404" in str(e):
-                    st.error("🚨 CRITICAL: 'requirements.txt' is missing or outdated! Please add 'google-generativeai>=0.7.0' to requirements.txt and REBOOT the app.")
+                # --- DIRECT REST API CALL (Bypasses Library Version) ---
+                api_key = st.secrets["GEMINI_API_KEY"]
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+                headers = {"Content-Type": "application/json"}
+                data = {"contents": [{"parts": [{"text": prompt}]}]}
+                
+                response = requests.post(url, headers=headers, data=json.dumps(data))
+                
+                if response.status_code == 200:
+                    ai_text = response.json()['candidates'][0]['content']['parts'][0]['text']
+                    st.info(ai_text)
                 else:
-                    st.error(f"AI Error: {e}")
+                    st.error(f"API Error {response.status_code}: {response.text}")
+                    
+            except Exception as e:
+                st.error(f"Connection Error: {e}")
 
 else:
     st.title("☸️ TaraVaani")

@@ -9,7 +9,7 @@ import google.generativeai as genai
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS
+# Custom CSS for UI
 st.markdown("""
 <style>
     .header-box { 
@@ -183,7 +183,7 @@ with st.sidebar:
         profiles = []
     
     if profiles:
-        sel_prof = st.selectbox("Select Profile", [p['Name'] for p in profiles], label_visibility="collapsed")
+        sel_prof = st.selectbox("Select Profile", [p['Name'] for p in profiles], key="profile_select", label_visibility="collapsed")
         if st.button("Load Profile"):
             found = next((p for p in profiles if p['Name'] == sel_prof), None)
             if found:
@@ -228,11 +228,11 @@ if st.session_state.current_data:
         
         with st.spinner(f"Consulting stars in {lang_opt}..."):
             try:
-                # --- MANDATORY STABLE V1 FIX ---
-                # Bypasses the broken 'v1beta' URL by forcing REST and the full model path
+                # --- FORCED STABLE V1 FIX ---
+                # Configuring to use REST transport and stable endpoint to bypass 404
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
                 
-                # Explicit model resource path required by stable v1 endpoint
+                # Explicit stable model identifier
                 model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
                 
                 response = model.generate_content(prompt)
@@ -240,7 +240,7 @@ if st.session_state.current_data:
                 if response and response.text:
                     st.info(response.text)
                 else:
-                    st.warning("The stars are silent. Check Google Billing or Quota limits.")
+                    st.warning("The stars are silent. Check Google Billing or Quotas.")
                     
             except Exception as e:
                 st.error(f"Prediction Error: {e}")

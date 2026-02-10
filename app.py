@@ -9,7 +9,7 @@ import google.generativeai as genai
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS
+# Custom CSS for UI
 st.markdown("""
 <style>
     .header-box { 
@@ -23,6 +23,7 @@ st.markdown("""
         text-align: center;
     }
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
+    .stChatInput { position: fixed; bottom: 0; padding-bottom: 15px; z-index: 1000; background: #0E1117; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -77,9 +78,12 @@ def get_gana_yoni(nak):
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
-    if "Lahiri" in ayanamsa_mode: swe.set_sid_mode(swe.SIDM_LAHIRI)
-    elif "Raman" in ayanamsa_mode: swe.set_sid_mode(swe.SIDM_RAMAN)
-    elif "KP" in ayanamsa_mode: swe.set_sid_mode(5) 
+    if "Lahiri" in ayanamsa_mode: 
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+    elif "Raman" in ayanamsa_mode: 
+        swe.set_sid_mode(swe.SIDM_RAMAN)
+    elif "KP" in ayanamsa_mode: 
+        swe.set_sid_mode(5) 
     
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
@@ -101,9 +105,11 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
             pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL | swe.FLG_MOSEPH)[0][0]
             sign = zodiac[int(pos // 30) % 12]
             deg = pos % 30
-            nak = nak_list[int(pos / (360/27)) % 27]
+            nak_idx = int(pos / (360/27)) % 27
+            nak = nak_list[nak_idx]
             results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
-            if p == "Moon": user_rashi, user_nak = sign, nak
+            if p == "Moon": 
+                user_rashi, user_nak = sign, nak
         except: 
             results.append(f"{p}: Error")
 
@@ -117,45 +123,67 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
 # --- 6. SIDEBAR UI ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
-    lang_opt = st.selectbox("AI Language", ["English", "Hindi", "Bengali", "Marathi", "Tamil", "Telugu", "Kannada", "Gujarati", "Malayalam"])
+    
+    st.markdown("### 🗣️ AI Language")
+    lang_opt = st.selectbox(
+        "Select output language",
+        ["English", "Hindi", "Bengali", "Marathi", "Tamil", "Telugu", "Kannada", "Gujarati", "Malayalam"],
+        label_visibility="collapsed"
+    )
     st.divider()
 
     st.header("Create Profile")
     n_in = st.text_input("Full Name", "Suman Naskar")
     g_in = st.selectbox("Gender", ["Male", "Female"])
-    d_in = st.date_input("Date of Birth", value=datetime.date(1993, 4, 23))
+    
+    d_in = st.date_input(
+        "Date of Birth", 
+        value=datetime.date(1993, 4, 23), 
+        min_value=datetime.date(1900, 1, 1), 
+        max_value=datetime.date(2025, 12, 31),
+        format="DD/MM/YYYY" 
+    )
     
     c1, c2 = st.columns(2)
     with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=15)
     with c2: mn_in = st.selectbox("Minute", range(60), index=45)
     
     city_in = st.text_input("Birth City", value="Kolkata, India")
-    ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
+
+    with st.expander("⚙️ Advanced Settings"):
+        ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
     
     if st.button("Generate Kundali", type="primary"):
         with st.spinner("Calculating..."):
             try:
                 res = geocoder.geocode(city_in)
                 if res:
-                    chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), res[0]['geometry']['lat'], res[0]['geometry']['lng'], res[0]['formatted'], ayanamsa_opt)
+                    lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
+                    fmt_city = res[0]['formatted']
+                    chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, fmt_city, ayanamsa_opt)
+                    
                     try:
                         db.collection("users").document(st.session_state.user_id).collection("profiles").document(n_in).set(chart)
                     except:
                         pass
+                    
                     st.session_state.current_data = chart
                     st.rerun()
-                else: st.error("City not found.")
-            except Exception as e: st.error(f"Error: {e}")
+                else:
+                    st.error("City not found.")
+            except Exception as e:
+                st.error(f"Error: {e}")
 
     st.divider()
     st.subheader("📂 Saved Profiles")
     try:
         docs = db.collection("users").document(st.session_state.user_id).collection("profiles").stream()
         profiles = [d.to_dict() for d in docs]
-    except: profiles = []
+    except:
+        profiles = []
     
     if profiles:
-        sel_prof = st.selectbox("Select Profile", [p['Name'] for p in profiles], label_visibility="collapsed")
+        sel_prof = st.selectbox("Select Profile", [p['Name'] for p in profiles], key="profile_select", label_visibility="collapsed")
         if st.button("Load Profile"):
             found = next((p for p in profiles if p['Name'] == sel_prof), None)
             if found:
@@ -165,12 +193,18 @@ with st.sidebar:
 # --- 7. MAIN UI ---
 if st.session_state.current_data:
     d = st.session_state.current_data
+    
     st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
     
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Lagna", d['Lagna']); c2.metric("Rashi", d['Rashi']); c3.metric("Nakshatra", d['Nakshatra']); c4.metric("Gana", d['Gana']); c5.metric("Yoni", d['Yoni'])
+    c1.metric("Lagna", d['Lagna'])
+    c2.metric("Rashi", d['Rashi'])
+    c3.metric("Nakshatra", d['Nakshatra'])
+    c4.metric("Gana", d['Gana'])
+    c5.metric("Yoni", d['Yoni'])
     
     st.divider()
+    st.subheader("📜 Planetary Degrees")
     st.code(d['Full_Chart'], language="text")
     st.divider()
 
@@ -178,19 +212,36 @@ if st.session_state.current_data:
     q_topic = st.selectbox("Choose a Topic:", ["General Life Overview", "Career & Success", "Marriage & Relationships", "Health & Vitality", "Wealth & Finance"])
 
     if st.button("✨ Get Prediction"):
-        prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']}. Chart: {d['Full_Chart']}. Predict about {q_topic} in {lang_opt} language. Style: Mystic, positive."
+        prompt = f"""
+        Act as Vedic Astrologer TaraVaani.
+        User: {d['Name']} ({d['Gender']}).
+        Chart:
+        - Lagna: {d['Lagna']}
+        - Rashi: {d['Rashi']}
+        - Nakshatra: {d['Nakshatra']}
+        - Planets: {d['Full_Chart']}
         
-        with st.spinner(f"Consulting stars..."):
+        Question: Predict about {q_topic}.
+        IMPORTANT: Write response in {lang_opt} language.
+        Style: Mystic, positive, clear. Use bullet points.
+        """
+        
+        with st.spinner(f"Consulting stars in {lang_opt}..."):
             try:
-                # CRITICAL: Force REST and stable path
+                # --- FORCED STABLE V1 FIX ---
+                # Configuring to use REST transport and stable endpoint to bypass 404
                 genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
                 
-                # By using the 'models/' prefix, we force the library out of 'v1beta'
+                # Explicit stable model identifier
                 model = genai.GenerativeModel(model_name="models/gemini-1.5-flash")
                 
                 response = model.generate_content(prompt)
-                if response.text: st.info(response.text)
-                else: st.warning("The stars are silent. Check your billing.")
+                
+                if response and response.text:
+                    st.info(response.text)
+                else:
+                    st.warning("The stars are silent. Check Google Billing or Quotas.")
+                    
             except Exception as e:
                 st.error(f"Prediction Error: {e}")
 

@@ -5,75 +5,11 @@ import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
-import time
 
-# --- 1. CONFIGURATION & CSS ---
+# --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS for Mobile-App Look
-st.markdown("""
-<style>
-    /* Dark Mode Global */
-    .stApp { background-color: #121212; color: #E0E0E0; }
-    
-    /* TOP HEADER (Wallet) */
-    .top-header {
-        display: flex; justify-content: space-between; align-items: center;
-        padding: 15px; background-color: #1e1e1e; 
-        border-bottom: 1px solid #333; margin-bottom: 10px;
-    }
-    .wallet-badge {
-        background-color: #FFD700; color: #000; padding: 5px 10px;
-        border-radius: 15px; font-weight: bold; font-size: 14px;
-    }
-    
-    /* PROFILE RIBBON (Top of Home) */
-    .profile-scroll {
-        display: flex; overflow-x: auto; gap: 10px; padding: 10px 0;
-        scrollbar-width: none; /* Hide scrollbar */
-    }
-    .mini-profile {
-        background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-        color: white; padding: 10px; border-radius: 10px; 
-        min-width: 100px; text-align: center; cursor: pointer;
-        border: 1px solid rgba(255,255,255,0.2);
-    }
-    .mini-profile.active {
-        border: 2px solid #FFD700; box-shadow: 0 0 10px #FFD700;
-    }
-
-    /* ACTION RIBBON (Horoscope/Matching) */
-    .action-ribbon {
-        display: flex; gap: 10px; margin: 20px 0;
-    }
-    .action-card {
-        flex: 1; background-color: #D32F2F; color: white;
-        padding: 20px; border-radius: 12px; text-align: center;
-        font-weight: bold; cursor: pointer;
-    }
-    
-    /* BOTTOM NAVIGATION (Sticky) */
-    .bottom-nav {
-        position: fixed; bottom: 0; left: 0; width: 100%;
-        background-color: #1e1e1e; border-top: 1px solid #333;
-        padding: 10px 0; display: flex; justify-content: space-around;
-        z-index: 9999;
-    }
-    .nav-btn {
-        background: none; border: none; color: #888; 
-        font-size: 12px; display: flex; flex-direction: column; align-items: center;
-    }
-    .nav-btn.active { color: #FFD700; }
-    
-    /* Hide Streamlit Elements */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-</style>
-""", unsafe_allow_html=True)
-
-# --- 2. FIREBASE & API SETUP ---
+# --- 2. FIREBASE CONNECTION ---
 if not firebase_admin._apps:
     try:
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"]
@@ -99,279 +35,207 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
+# --- 3. API SETUP ---
 try:
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
-except: pass
+except:
+    st.warning("⚠️ Checking API Keys...")
 
-# --- 3. SESSION STATE ---
-if 'user_id' not in st.session_state: st.session_state.user_id = None
-if 'user_phone' not in st.session_state: st.session_state.user_phone = None
-if 'current_page' not in st.session_state: st.session_state.current_page = "Login"
-if 'wallet_balance' not in st.session_state: st.session_state.wallet_balance = 0
-if 'active_profile' not in st.session_state: st.session_state.active_profile = None # The profile currently shown on Home
+# --- 4. SESSION STATE ---
+if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin" 
+if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-# --- 4. CALCULATION ENGINE (Hidden Logic) ---
-def calculate_chart(name, gender, dt, tm, city):
-    # Simplified wrapper for brevity (Logic remains same as previous code)
-    # Using Moshier + Lahiri default
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
+# --- 5. ASTROLOGY ENGINE ---
+def get_gana_yoni(nak):
+    data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
+    return data.get(nak, ("Unknown", "Unknown"))
+
+def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
+    # --- AYANAMSA SELECTION ---
+    if "Lahiri" in ayanamsa_mode:
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+    elif "Raman" in ayanamsa_mode:
+        swe.set_sid_mode(swe.SIDM_RAMAN)
+    elif "KP" in ayanamsa_mode:
+        swe.set_sid_mode(5) # Integer 5 represents KP New
     
-    # Geocode
-    try:
-        res = geocoder.geocode(city)
-        lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
-    except:
-        lat, lng = 22.57, 88.36 # Default Kolkata
-    
+    # 1. Time Conversion
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
+    # 2. Calculate Ascendant
     ayanamsa = swe.get_ayanamsa_ut(jd)
-    cusps, ascmc = swe.houses(jd, lat, lng, b'P')
+    cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     asc_deg = (ascmc[0] - ayanamsa) % 360
-    zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    lagna = zodiac[int(asc_deg // 30)]
     
-    # Get Moon Rashi
-    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL | swe.FLG_MOSEPH)[0][0]
-    moon_sign = zodiac[int(moon_pos // 30) % 12]
+    zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+    lagna_sign = zodiac[int(asc_deg // 30)]
+    lagna_val = asc_deg % 30
+    
+    # 3. Calculate Planets (Crash-Proof)
+    planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
+    results = []
+    user_rashi, user_nak = "", ""
+    nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
+
+    # Use Moshier flag for stability (No files needed)
+    CALC_FLAG = swe.FLG_SIDEREAL | swe.FLG_MOSEPH
+    
+    for p, pid in planet_map.items():
+        try:
+            pos = swe.calc_ut(jd, pid, CALC_FLAG)[0][0]
+            sign = zodiac[int(pos // 30) % 12]
+            deg = pos % 30
+            nak_idx = int(pos / (360/27)) % 27
+            nak = nak_list[nak_idx]
+            results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
+            if p == "Moon": user_rashi, user_nak = sign, nak
+        except:
+            results.append(f"{p}: Error")
+
+    gana, yoni = get_gana_yoni(user_nak)
     
     return {
-        "Name": name, "Gender": gender, "Lagna": lagna, "Rashi": moon_sign,
-        "Date": str(dt), "Time": str(tm), "City": city,
-        "Lat": lat, "Lng": lng
+        "Name": name, "Gender": gender,
+        "Lagna": lagna_sign, "Lagna_Deg": f"{lagna_val:.2f}",
+        "Rashi": user_rashi, "Nakshatra": user_nak,
+        "Gana": gana, "Yoni": yoni, "City": city,
+        "Full_Chart": "\n".join(results)
     }
 
-# --- 5. PAGE: LOGIN FLOW ---
-if st.session_state.current_page == "Login":
-    st.markdown("## 👋 Welcome to TaraVaani")
-    st.info("Please Sign In to continue.")
+# --- 6. SIDEBAR ---
+with st.sidebar:
+    st.title("☸️ TaraVaani")
     
-    # 1. Google Sign In (Simulated Button)
-    if st.button("🇬 Google Sign In"):
-        st.session_state.login_step = 2
-        st.rerun()
-
-    if st.session_state.get('login_step') == 2:
-        st.markdown("### 📱 Mobile Verification")
-        phone = st.text_input("Enter Phone Number (+91)", "+91 ")
-        if st.button("Send OTP (WhatsApp)"):
-            with st.spinner("Sending OTP via WhatsApp..."):
-                time.sleep(2) # Simulate API call
-                st.success("OTP Sent to WhatsApp!")
-                st.session_state.login_step = 3
-                st.rerun()
-
-    if st.session_state.get('login_step') == 3:
-        otp = st.text_input("Enter OTP", type="password")
-        if st.button("Verify & Create Profile"):
-            if otp: # In real app, check if otp == sent_otp
-                st.session_state.user_phone = phone
-                st.session_state.login_step = 4
-                st.rerun()
-
-    if st.session_state.get('login_step') == 4:
-        st.markdown("### 👤 Create Your Profile")
-        with st.form("first_profile"):
-            name = st.text_input("Name")
-            gender = st.selectbox("Gender", ["Male", "Female"])
-            dob = st.date_input("Birth Date", value=datetime.date(1990,1,1))
-            t_hr = st.selectbox("Hour", range(24))
-            t_min = st.selectbox("Minute", range(60))
-            city = st.text_input("City", "Kolkata, India")
-            
-            if st.form_submit_button("Start TaraVaani 🚀"):
-                # Save to Firebase
-                user_id = f"{name}_{int(time.time())}"
-                st.session_state.user_id = user_id
-                
-                chart_data = calculate_chart(name, gender, dob, datetime.time(t_hr, t_min), city)
-                db.collection("users").document(user_id).collection("profiles").document(name).set(chart_data)
-                
-                # Auto Set Active Profile
-                st.session_state.active_profile = chart_data
-                st.session_state.current_page = "Home"
-                st.rerun()
-
-# --- 6. PAGE: HOME ---
-elif st.session_state.current_page == "Home":
-    # --- Top Header ---
-    st.markdown(f"""
-    <div class="top-header">
-        <div style="font-size:20px;">☸️ <b>TaraVaani</b></div>
-        <div class="wallet-badge">₹{st.session_state.wallet_balance}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # --- Fetch Profiles ---
-    try:
-        docs = db.collection("users").document(st.session_state.user_id).collection("profiles").stream()
-        all_profiles = [doc.to_dict() for doc in docs]
-    except: all_profiles = []
-
-    # Ensure active profile is valid
-    if not st.session_state.active_profile and all_profiles:
-        st.session_state.active_profile = all_profiles[0]
-
-    # --- 1. Top Ribbon (Only if > 1 profile) ---
-    if len(all_profiles) > 1:
-        st.markdown("**Switch Profile:**")
-        cols = st.columns(len(all_profiles))
-        for i, p in enumerate(all_profiles):
-            is_active = (p['Name'] == st.session_state.active_profile['Name'])
-            btn_label = f"🟢 {p['Name']}" if is_active else p['Name']
-            if cols[i].button(btn_label, key=f"top_prof_{i}"):
-                st.session_state.active_profile = p
-                st.rerun()
-
-    # --- 2. Action Ribbon (Horoscope & Matching) ---
+    st.header("Create Profile")
+    n_in = st.text_input("Full Name")
+    g_in = st.selectbox("Gender", ["Male", "Female"])
+    
+    # Date Range: 1900 - 2025
+    d_in = st.date_input(
+        "Date of Birth", 
+        value=datetime.date(1993, 4, 23), 
+        min_value=datetime.date(1900, 1, 1), 
+        max_value=datetime.date(2025, 12, 31),
+        format="DD/MM/YYYY"
+    )
+    
     c1, c2 = st.columns(2)
-    with c1:
-        st.markdown('<div class="action-card">🌅<br>Daily Horoscope</div>', unsafe_allow_html=True)
-        if st.button("Read Horoscope", key="btn_horo", use_container_width=True):
-            st.session_state.show_horoscope = True
-    with c2:
-        st.markdown('<div class="action-card">❤️<br>Matching</div>', unsafe_allow_html=True)
-        st.button("Check Match", key="btn_match", use_container_width=True)
-
-    # --- Horoscope Logic (Pop-up style) ---
-    if st.session_state.get('show_horoscope'):
-        p = st.session_state.active_profile
-        st.info(f"📅 **Daily Horoscope for {p['Name']} ({p['Rashi']})**")
-        st.write("Today is a powerful day for career growth. Avoid arguments.")
-        st.success("**Lucky Color:** Green | **Lucky No:** 5")
-        if st.button("Close"): 
-            st.session_state.show_horoscope = False
-            st.rerun()
-
-    # --- 3. Toggle Menu (Tabs) ---
-    if st.session_state.active_profile:
-        p = st.session_state.active_profile
-        st.markdown(f"### 📜 Chart: {p['Name']}")
-        
-        t1, t2, t3, t4, t5 = st.tabs(["Basic", "Charts", "KP", "Dasha", "Report"])
-        
-        with t1:
-            c1, c2 = st.columns(2)
-            c1.metric("Lagna", p['Lagna'])
-            c2.metric("Rashi", p['Rashi'])
-            c1.metric("Gender", p['Gender'])
-            c2.metric("City", p['City'])
-
-        with t2:
-            st.info("Chart Visualization Coming Soon") # Placeholder for graphical chart
-            
-        with t3: st.warning("KP System Calculation...")
-        with t4: st.warning("Vimshottari Dasha Table...")
-        
-        with t5: # REPORT (AI)
-            st.write("Ask Gemini about this chart:")
-            q = st.selectbox("Topic", ["General", "Career", "Health"])
-            if st.button("Generate AI Report"):
-                prompt = f"Analyze Vedic chart for {p['Name']}, Lagna {p['Lagna']}, Rashi {p['Rashi']}. Tell about {q}."
-                with st.spinner("TaraVaani is writing..."):
-                    try:
-                        res = model.generate_content(prompt)
-                        st.write(res.text)
-                    except: st.error("AI Error")
-
-# --- 7. PAGE: CHAT (TaraVaani Agent) ---
-elif st.session_state.current_page == "Chat":
-    st.markdown("### 💬 Chat with TaraVaani")
+    with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=4)
+    with c2: mn_in = st.selectbox("Minute", range(60), index=30)
     
-    # Simple Chat Interface
-    if "messages" not in st.session_state:
-        st.session_state.messages = [{"role": "assistant", "content": "Namaste! I am TaraVaani. Ask me anything about your chart."}]
+    city_in = st.text_input("Birth City", value="Kolkata, India")
 
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    if prompt := st.chat_input("Ask about your future..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-            # Context Aware Response
-            p = st.session_state.active_profile
-            full_prompt = f"User: {p['Name']}, Rashi: {p['Rashi']}. Question: {prompt}. Answer as Vedic Astrologer."
-            try:
-                response = model.generate_content(full_prompt)
-                bot_reply = response.text
-                st.markdown(bot_reply)
-                st.session_state.messages.append({"role": "assistant", "content": bot_reply})
-            except: st.error("Connection failed.")
-
-# --- 8. PAGE: PROFILE & WALLET ---
-elif st.session_state.current_page == "Profile":
-    st.markdown("### 👤 My Profile")
-    st.metric("Wallet Balance", f"₹{st.session_state.wallet_balance}")
-    
-    st.markdown("#### 💳 Recharge Wallet")
-    c1, c2, c3 = st.columns(3)
-    if c1.button("₹300"): 
-        st.session_state.wallet_balance += 300
-        st.balloons()
-        st.rerun()
-    if c2.button("₹500"): 
-        st.session_state.wallet_balance += 500
-        st.balloons()
-        st.rerun()
-    if c3.button("₹1000"): 
-        st.session_state.wallet_balance += 1000
-        st.balloons()
-        st.rerun()
-        
     st.divider()
     
-    st.markdown("#### ➕ Add Family Member")
-    with st.expander("Create New Kundali"):
-        with st.form("new_family"):
-            n = st.text_input("Name")
-            g = st.selectbox("Gender", ["Male", "Female"])
-            d = st.date_input("Date")
-            t_h = st.selectbox("Hr", range(24))
-            t_m = st.selectbox("Mn", range(60))
-            ct = st.text_input("City", "Delhi")
-            
-            if st.form_submit_button("Add Member"):
-                c_data = calculate_chart(n, g, d, datetime.time(t_h, t_m), ct)
-                db.collection("users").document(st.session_state.user_id).collection("profiles").document(n).set(c_data)
-                st.success(f"{n} added!")
+    # --- AYANAMSA SETTINGS ---
+    with st.expander("⚙️ Advanced Settings"):
+        st.caption("Change calculation system if your chart differs.")
+        ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
+    
+    if st.button("🔮 Generate Kundali"):
+        with st.spinner("Calculating..."):
+            res = geocoder.geocode(city_in)
+            if res:
+                lat = res[0]['geometry']['lat']
+                lng = res[0]['geometry']['lng']
+                formatted_city = res[0]['formatted']
+                
+                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city, ayanamsa_opt)
+                
+                try:
+                    user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+                    user_ref.document(n_in).set(chart)
+                except: pass
+                
+                st.session_state.current_data = chart
                 st.rerun()
+            else:
+                st.error("City not found.")
 
     st.divider()
-    st.markdown("#### 📜 Saved Kundalis")
+    
+    # Load Profile
     try:
-        docs = db.collection("users").document(st.session_state.user_id).collection("profiles").stream()
-        for doc in docs:
-            d = doc.to_dict()
-            st.text(f"• {d['Name']} ({d['Rashi']})")
-    except: pass
+        user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+        profiles = [doc.to_dict() for doc in user_ref.stream()]
+    except: profiles = []
 
-# --- 9. BOTTOM NAVIGATION (Sticky Footer) ---
-# Only show if logged in
-if st.session_state.current_page != "Login":
-    st.markdown("---") 
-    st.markdown('<div style="margin-bottom: 60px;"></div>', unsafe_allow_html=True) # Spacer
-    
-    # We use columns to simulate buttons, but in a real mobile app this is a fixed footer
-    # Using Streamlit columns at the very end of script
-    c1, c2, c3 = st.columns(3)
-    
-    # Helper to styling active button
-    def nav_style(page_name):
-        return "primary" if st.session_state.current_page == page_name else "secondary"
+    if profiles:
+        st.subheader("📂 Saved Profiles")
+        selected_prof = st.selectbox("Select", [p['Name'] for p in profiles])
+        if st.button("Load"):
+            found = next((p for p in profiles if p['Name'] == selected_prof), None)
+            if found: st.session_state.current_data = found
 
-    if c1.button("🏠 Home", use_container_width=True, type=nav_style("Home")):
-        st.session_state.current_page = "Home"
-        st.rerun()
-    if c2.button("💬 Chat", use_container_width=True, type=nav_style("Chat")):
-        st.session_state.current_page = "Chat"
-        st.rerun()
-    if c3.button("👤 Profile", use_container_width=True, type=nav_style("Profile")):
-        st.session_state.current_page = "Profile"
-        st.rerun()
+# --- 7. MAIN UI ---
+st.markdown("""
+<style>
+.header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; font-size: 18px; font-weight: bold; margin-bottom: 20px; }
+</style>
+""", unsafe_allow_html=True)
+
+if st.session_state.get('current_data'):
+    d = st.session_state.current_data
+    
+    st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
+    
+    # --- Metrics ---
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    col1.metric("Lagna", d['Lagna'])
+    col2.metric("Rashi", d['Rashi'])
+    col3.metric("Nakshatra", d['Nakshatra'])
+    col4.metric("Gana", d['Gana'])
+    col5.metric("Yoni", d['Yoni'])
+    
+    st.divider()
+    st.subheader("📜 Planetary Degrees")
+    st.code(d['Full_Chart'], language="text")
+
+    # --- 8. AI PREDICTION ENGINE (INSERTED HERE) ---
+    st.divider()
+    st.subheader("🤖 Ask TaraVaani (AI Astrologer)")
+    
+    question = st.selectbox(
+        "Select a topic:",
+        [
+            "General Life Overview",
+            "Career & Success",
+            "Marriage & Relationships",
+            "Health & Vitality",
+            "Wealth & Finance"
+        ]
+    )
+    
+    if st.button("✨ Get Prediction"):
+        # Create a prompt for the AI
+        prompt = f"""
+        Act as an expert Vedic Astrologer named 'TaraVaani'.
+        Analyze this birth chart for {d['Name']} ({d['Gender']}):
+        
+        - Lagna (Ascendant): {d['Lagna']}
+        - Moon Sign (Rashi): {d['Rashi']}
+        - Nakshatra: {d['Nakshatra']}
+        - Planetary Positions:
+        {d['Full_Chart']}
+        
+        Task: Provide a detailed insight about "{question}".
+        Tone: Empathetic, spiritual, yet practical and honest.
+        Structure: Use bullet points and bold text for clarity. Keep it under 200 words.
+        """
+        
+        # Call Gemini AI
+        with st.spinner("Consulting the stars..."):
+            try:
+                response = model.generate_content(prompt)
+                st.markdown("### 🔮 TaraVaani Says:")
+                st.write(response.text)
+            except Exception as e:
+                st.error(f"AI Error: {e}")
+
+else:
+    st.info("👈 Please enter birth details in the sidebar.")

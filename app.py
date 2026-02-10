@@ -59,7 +59,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
     elif "Raman" in ayanamsa_mode:
         swe.set_sid_mode(swe.SIDM_RAMAN)
     elif "KP" in ayanamsa_mode:
-        # Use integer 5 for KP (Krishnamurti) to avoid AttributeError
+        # We use integer 5 because 'swe.SIDM_KP' is missing in some cloud versions
         swe.set_sid_mode(5) 
 
     # 1. Time Conversion
@@ -120,7 +120,7 @@ with st.sidebar:
         "Date of Birth", 
         value=datetime.date(1993, 4, 23), 
         min_value=datetime.date(1900, 1, 1), 
-        max_value=datetime.date(2025, 12, 31),
+        max_value=datetime.date(2100, 12, 31),
         format="DD/MM/YYYY"
     )
     
@@ -185,14 +185,6 @@ if st.session_state.get('current_data'):
     st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
     
     c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Lagna", f"{d['Lagna']} ({d.get('Lagna_Deg', '')}°)")
-    c2.metric("Rashi", d['Rashi'])
-    c3.metric("Nakshatra", d['Nakshatra'])
-    c4.metric("Gana", d['Gana'])
-    c5.metric("Yoni", d['Yoni'])
     
-    st.divider()
-    st.subheader("📜 Planetary Degrees")
-    st.code(d['Full_Chart'], language="text")
-else:
-    st.info("👈 Please enter birth details in the sidebar.")
+    # --- UI CLEANUP: Removed degrees from Lagna display ---
+    c

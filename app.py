@@ -9,7 +9,7 @@ from opencage.geocoder import OpenCageGeocode
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS for Green Header & Mobile look
+# Custom CSS for Green Header & Clean Look
 st.markdown("""
 <style>
     .header-box { 
@@ -23,7 +23,6 @@ st.markdown("""
         text-align: center;
     }
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
-    .stChatInput { position: fixed; bottom: 0; padding-bottom: 15px; z-index: 1000; background: #0E1117; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -55,7 +54,7 @@ try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     
     # We LOCK this to Flash. 
-    # If this fails, the user needs to update requirements.txt
+    # If this fails with 404, it means requirements.txt is missing/ignored.
     model = genai.GenerativeModel('gemini-1.5-flash')
     
 except Exception as e:
@@ -64,7 +63,6 @@ except Exception as e:
 # --- 4. SESSION STATE ---
 if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin"
 if 'current_data' not in st.session_state: st.session_state.current_data = None
-if 'chat_history' not in st.session_state: st.session_state.chat_history = []
 
 # --- 5. CALCULATOR ENGINE ---
 def get_gana_yoni(nak):
@@ -113,11 +111,11 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
         "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)
     }
 
-# --- 6. SIDEBAR UI (Exact Replica of Screenshot) ---
+# --- 6. SIDEBAR UI (Matches Screenshot) ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
     
-    # Language Selector (New Requirement)
+    # Language Selector
     st.markdown("### 🗣️ AI Language")
     lang_opt = st.selectbox(
         "Select output language",
@@ -138,7 +136,7 @@ with st.sidebar:
     
     city_in = st.text_input("Birth City", value="Kolkata, India")
 
-    # Advanced Settings (Requested Feature)
+    # Advanced Settings
     with st.expander("⚙️ Advanced Settings"):
         ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
     
@@ -165,7 +163,7 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"Error: {e}")
 
-    # Saved Profiles (Bottom of Sidebar)
+    # Saved Profiles
     st.divider()
     st.subheader("📂 Saved Profiles")
     try:
@@ -205,7 +203,7 @@ if st.session_state.current_data:
     # AI Chat Section
     st.subheader(f"🤖 Ask TaraVaani ({lang_opt})")
     
-    # Topic Selector (Requested Feature)
+    # Topic Selector
     q_topic = st.selectbox(
         "Choose a Topic:",
         ["General Life Overview", "Career & Success", "Marriage & Relationships", "Health & Vitality", "Wealth & Finance"]
@@ -233,7 +231,7 @@ if st.session_state.current_data:
             except Exception as e:
                 # Specific error message for the 404/Flash issue
                 if "404" in str(e):
-                    st.error("🚨 CRITICAL: 'requirements.txt' is missing or outdated! Please add 'google-generativeai>=0.7.0' to requirements.txt")
+                    st.error("🚨 CRITICAL: 'requirements.txt' is missing or outdated! Please add 'google-generativeai>=0.7.0' to requirements.txt and REBOOT the app.")
                 else:
                     st.error(f"AI Error: {e}")
 

@@ -1,4 +1,5 @@
 streamlit
 google-generativeai
-opencage
 pyswisseph
+opencage
+firebase-admin

@@ -6,10 +6,10 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
 
-# --- 1. CONFIG ---
+# --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# --- 2. FIREBASE BRIDGE ---
+# --- 2. FIREBASE CONNECTION ---
 if not firebase_admin._apps:
     try:
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"]
@@ -35,7 +35,7 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- 3. API ENGINES ---
+# --- 3. API SETUP ---
 try:
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -47,23 +47,26 @@ except:
 if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin" 
 if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-# --- 5. ASTROLOGY ENGINE (RAMAN MODE) ---
+# --- 5. ASTROLOGY ENGINE (Multi-System Support) ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
-def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
-    # --- CRITICAL CHANGE: USING RAMAN AYANAMSA ---
-    # This aligns the math with B.V. Raman's system, which often 
-    # yields Capricorn for borderline cases where Lahiri yields Aquarius.
-    swe.set_sid_mode(swe.SIDM_RAMAN) 
+def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri"):
+    # 1. Set Ayanamsa based on User Choice
+    if ayanamsa_mode == "Lahiri (Standard)":
+        swe.set_sid_mode(swe.SIDM_LAHIRI)
+    elif ayanamsa_mode == "Raman (Traditional)":
+        swe.set_sid_mode(swe.SIDM_RAMAN) # Takes chart back ~1.5 degrees
+    elif ayanamsa_mode == "KP (Krishnamurti)":
+        swe.set_sid_mode(swe.SIDM_KP)
     
-    # Time Conversion
+    # 2. Time Conversion
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # Calculations
+    # 3. Calculate Ascendant
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     asc_deg = (ascmc[0] - ayanamsa) % 360
@@ -72,36 +75,27 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     lagna_sign = zodiac[int(asc_deg // 30)]
     lagna_val = asc_deg % 30
     
+    # 4. Calculate Planets (Moshier Engine)
     planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
     results = []
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
-    # --- CRITICAL FIX: ANTI-CRASH RAHU ---
-    # Using 'FLG_MOSEPH' (Moshier) ensures we don't need external data files.
-    # This prevents the "swisseph.Error" you saw earlier.
-    CALC_FLAG = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
+    # Use Moshier flag to ensure stability
+    CALC_FLAG = swe.FLG_SIDEREAL | swe.FLG_MOSEPH
     
     for p, pid in planet_map.items():
         try:
-            if p == "Rahu":
-                # Fallback to Moshier for Rahu to prevent crash
-                try:
-                    pos = swe.calc_ut(jd, pid, CALC_FLAG)[0][0]
-                except:
-                    pos = swe.calc_ut(jd, pid, swe.FLG_MOSEPH | swe.FLG_SIDEREAL)[0][0]
-            else:
-                pos = swe.calc_ut(jd, pid, CALC_FLAG)[0][0]
-            
+            pos = swe.calc_ut(jd, pid, CALC_FLAG)[0][0]
             sign = zodiac[int(pos // 30) % 12]
             deg = pos % 30
             nak_idx = int(pos / (360/27)) % 27
             nak = nak_list[nak_idx]
             results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
             if p == "Moon": user_rashi, user_nak = sign, nak
-        except:
-            results.append(f"{p}: Calculation Error")
-            
+        except Exception as e:
+            results.append(f"{p}: Error")
+
     gana, yoni = get_gana_yoni(user_nak)
     
     return {
@@ -112,14 +106,14 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
         "Full_Chart": "\n".join(results)
     }
 
-# --- 6. SIDEBAR ---
+# --- 6. SIDEBAR UI ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
+    
     st.header("Create Profile")
     n_in = st.text_input("Full Name")
     g_in = st.selectbox("Gender", ["Male", "Female"])
     
-    # Date Range 1900-2025
     d_in = st.date_input(
         "Date of Birth", 
         value=datetime.date(1993, 4, 23), 
@@ -136,15 +130,22 @@ with st.sidebar:
 
     st.divider()
     
+    # --- AYANAMSA SETTINGS (The Professional Fix) ---
+    with st.expander("⚙️ Advanced Settings"):
+        st.caption("Change calculation system if your chart differs.")
+        # Default is Lahiri (Standard). User can switch to Raman.
+        ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
+    
     if st.button("🔮 Generate Kundali"):
-        with st.spinner("Aligning Stars..."):
+        with st.spinner("Calculating..."):
             res = geocoder.geocode(city_in)
             if res:
                 lat = res[0]['geometry']['lat']
                 lng = res[0]['geometry']['lng']
                 formatted_city = res[0]['formatted']
                 
-                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
+                # Pass the chosen Ayanamsa
+                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city, ayanamsa_opt)
                 
                 try:
                     user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
@@ -157,19 +158,21 @@ with st.sidebar:
                 st.error("City not found.")
 
     st.divider()
-    st.subheader("📂 Saved Profiles")
+    
+    # Load Profile
     try:
         user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
         profiles = [doc.to_dict() for doc in user_ref.stream()]
     except: profiles = []
 
     if profiles:
-        selected_prof = st.selectbox("Select Profile", [p['Name'] for p in profiles])
+        st.subheader("📂 Saved Profiles")
+        selected_prof = st.selectbox("Select", [p['Name'] for p in profiles])
         if st.button("Load"):
             found = next((p for p in profiles if p['Name'] == selected_prof), None)
             if found: st.session_state.current_data = found
 
-# --- 7. UI ---
+# --- 7. MAIN UI ---
 st.markdown("""
 <style>
 .header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; font-size: 18px; font-weight: bold; margin-bottom: 20px; }

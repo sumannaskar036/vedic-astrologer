@@ -58,21 +58,19 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     swe.set_sid_mode(swe.SIDM_TRUE_CITRA) 
     
     # Force Topocentric Calculation (User standing ON Earth, not center)
-    # Important: SwissEph expects (Longitude, Latitude, Altitude)
     swe.set_topo(lon, lat, 10) # 10 meters altitude (average)
 
     # Time Handling (IST to UTC)
     local_dt = datetime.datetime.combine(dt, tm)
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     
-    # Calculate Julian Day (ET - Ephemeris Time for planetary precision)
+    # Calculate Julian Day
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
     # Calculate Ayanamsa
     ayanamsa = swe.get_ayanamsa_ut(jd)
     
     # Calculate Ascendant (Lagna)
-    # houses() returns tropical cusps. We strictly subtract Ayanamsa.
     cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
     asc_tropical = ascmc[0] 
     asc_sidereal = (asc_tropical - ayanamsa) % 360
@@ -132,7 +130,6 @@ with st.sidebar:
                 lng = res[0]['geometry']['lng']
                 formatted_city = res[0]['formatted']
                 
-                # No manual override anymore. Just pure math.
                 chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
                 try:
@@ -168,7 +165,6 @@ if st.session_state.get('current_data'):
     d = st.session_state.current_data
     st.success(f"Janma Kundali: {d['Name']} 🙏")
     
-    # Technical Data for Verification
     st.caption(f"📍 {d.get('City', 'Unknown')} | ⏱️ UTC: {d.get('UTC_Time', '')}")
     
     cols = st.columns(5)
@@ -182,4 +178,4 @@ if st.session_state.get('current_data'):
     st.subheader("📜 Planetary Degrees")
     st.code(d['Full_Chart'], language="text")
 else:
-    st.info("👈 Please enter birth details in the sidebar.")info("👈 Please enter birth details in the sidebar.")
+    st.info("👈 Please enter birth details in the sidebar.")

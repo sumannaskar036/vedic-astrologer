@@ -9,7 +9,7 @@ from opencage.geocoder import OpenCageGeocode
 # --- 1. CONFIG ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# --- 2. FIREBASE BRIDGE (Auto-Fix) ---
+# --- 2. FIREBASE BRIDGE ---
 if not firebase_admin._apps:
     try:
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"]
@@ -47,51 +47,54 @@ try:
 except:
     st.warning("⚠️ Checking API Keys...")
 
-# --- 5. ASTROLOGY ENGINE (Rectification Removed) ---
+# --- 5. ASTROLOGY ENGINE (FIXED LAGNA LOGIC) ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    swe.set_sid_mode(swe.SIDM_LAHIRI) # Set Sidereal Mode
     
-    # Standard Time Calculation (No Rectification)
+    # 1. Prepare Time (IST to UTC)
     local_dt = datetime.datetime.combine(dt, tm)
-    
-    # Convert to UTC (Assuming IST -5:30 for now based on your previous code logic)
-    # Note: For global usage, you might eventually need dynamic timezones, 
-    # but I kept your logic intact for now.
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
-    
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # Calculate Ayanamsa
+    # 2. Get Ayanamsa (The difference between Tropical and Vedic)
     ayanamsa = swe.get_ayanamsa_ut(jd)
     
-    # 1. Calculate Ascendant (Lagna)
-    res = swe.calc_ut(jd, swe.ASC, 0) # Get Tropical Ascendant first
-    asc_tropical = res[0][0]
+    # 3. Calculate Ascendant (LAGNA) - FIXED 🛠️
+    # We must use swe.houses() to account for Latitude/Longitude!
+    # 'P' stands for Placidus (standard), but Ascendant degree is same in most systems.
+    cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
+    asc_tropical = ascmc[0] # The first value is the Ascendant
     
-    # Subtract Ayanamsa for Vedic
+    # Convert Tropical Ascendant to Vedic (Sidereal)
     asc_sidereal = (asc_tropical - ayanamsa) % 360
     
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
     lagna_sign = zodiac[int(asc_sidereal // 30)]
     lagna_deg = asc_sidereal % 30
     
-    # 2. Calculate Planets
-    SIDEREAL_FLAG = 64 * 1024 
+    # 4. Calculate Planets
+    SIDEREAL_FLAG = 64 * 1024 # Flag to force Sidereal calculation for planets
     planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
     results = []
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
     for p, pid in planet_map.items():
+        # Calculate planet position
         pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
         sign = zodiac[int(pos // 30)]
         deg = pos % 30
-        nak = nak_list[int(pos / (360/27))]
+        
+        # Calculate Nakshatra
+        nak_index = int(pos / (360/27))
+        nak = nak_list[nak_index % 27] # Modulo 27 for safety
+        
         results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
+        
         if p == "Moon": user_rashi, user_nak = sign, nak
             
     gana, yoni = get_gana_yoni(user_nak)
@@ -118,7 +121,6 @@ with st.sidebar:
     city_in = st.text_input("Birth City", value="Kolkata, India", help="Type exact city name")
 
     st.divider()
-    # (Rectification Section Removed Here)
     
     if st.button("🔮 Generate Kundali"):
         with st.spinner("Aligning Stars..."):
@@ -128,7 +130,6 @@ with st.sidebar:
                 lng = res[0]['geometry']['lng']
                 formatted_city = res[0]['formatted']
                 
-                # Removed the 'correction' argument
                 chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
                 try:
@@ -153,7 +154,6 @@ with st.sidebar:
     if profiles:
         selected_prof = st.selectbox("Load Profile", [p['Name'] for p in profiles])
         if st.button("Load"):
-            # Fixed logic to find profile
             found_profile = next((p for p in profiles if p['Name'] == selected_prof), None)
             if found_profile:
                 st.session_state.current_data = found_profile

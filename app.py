@@ -47,26 +47,27 @@ except:
 if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin" 
 if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-# --- 5. ASTROLOGY ENGINE (Multi-System Support) ---
+# --- 5. ASTROLOGY ENGINE ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
-def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri"):
-    # 1. Set Ayanamsa based on User Choice
-    if ayanamsa_mode == "Lahiri (Standard)":
+def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
+    # --- AYANAMSA SELECTION (Fixed KP Crash) ---
+    if "Lahiri" in ayanamsa_mode:
         swe.set_sid_mode(swe.SIDM_LAHIRI)
-    elif ayanamsa_mode == "Raman (Traditional)":
-        swe.set_sid_mode(swe.SIDM_RAMAN) # Takes chart back ~1.5 degrees
-    elif ayanamsa_mode == "KP (Krishnamurti)":
-        swe.set_sid_mode(swe.SIDM_KP)
-    
-    # 2. Time Conversion
+    elif "Raman" in ayanamsa_mode:
+        swe.set_sid_mode(swe.SIDM_RAMAN)
+    elif "KP" in ayanamsa_mode:
+        # Use integer 5 for KP (Krishnamurti) to avoid AttributeError
+        swe.set_sid_mode(5) 
+
+    # 1. Time Conversion
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # 3. Calculate Ascendant
+    # 2. Calculate Ascendant
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     asc_deg = (ascmc[0] - ayanamsa) % 360
@@ -75,13 +76,13 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
     lagna_sign = zodiac[int(asc_deg // 30)]
     lagna_val = asc_deg % 30
     
-    # 4. Calculate Planets (Moshier Engine)
+    # 3. Calculate Planets (Crash-Proof)
     planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
     results = []
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
-    # Use Moshier flag to ensure stability
+    # Use Moshier flag for stability
     CALC_FLAG = swe.FLG_SIDEREAL | swe.FLG_MOSEPH
     
     for p, pid in planet_map.items():
@@ -93,7 +94,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
             nak = nak_list[nak_idx]
             results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
             if p == "Moon": user_rashi, user_nak = sign, nak
-        except Exception as e:
+        except:
             results.append(f"{p}: Error")
 
     gana, yoni = get_gana_yoni(user_nak)
@@ -106,7 +107,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
         "Full_Chart": "\n".join(results)
     }
 
-# --- 6. SIDEBAR UI ---
+# --- 6. SIDEBAR ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
     
@@ -114,6 +115,7 @@ with st.sidebar:
     n_in = st.text_input("Full Name")
     g_in = st.selectbox("Gender", ["Male", "Female"])
     
+    # Date Range: 1900 - 2025
     d_in = st.date_input(
         "Date of Birth", 
         value=datetime.date(1993, 4, 23), 
@@ -130,10 +132,9 @@ with st.sidebar:
 
     st.divider()
     
-    # --- AYANAMSA SETTINGS (The Professional Fix) ---
+    # --- AYANAMSA SETTINGS ---
     with st.expander("⚙️ Advanced Settings"):
         st.caption("Change calculation system if your chart differs.")
-        # Default is Lahiri (Standard). User can switch to Raman.
         ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
     
     if st.button("🔮 Generate Kundali"):
@@ -144,7 +145,6 @@ with st.sidebar:
                 lng = res[0]['geometry']['lng']
                 formatted_city = res[0]['formatted']
                 
-                # Pass the chosen Ayanamsa
                 chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city, ayanamsa_opt)
                 
                 try:

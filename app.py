@@ -159,7 +159,9 @@ with st.sidebar:
     g_in = st.selectbox("Gender", ["Male","Female"])
     d_in = st.date_input(
     "Date of Birth",
-    value=datetime.date.today(),
+    value=None,
+    min_value=datetime.date(1900, 1, 1),
+    max_value=datetime.date.today(),
     format="DD/MM/YYYY"
 )
     c1, c2 = st.columns(2)

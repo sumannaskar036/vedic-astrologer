@@ -7,10 +7,10 @@ from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
 import json
 
-# --- 1. GLOBAL CONFIG ---
+# --- 1. CONFIG ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# --- 2. FIREBASE BRIDGE (Auto-Fix Included) ---
+# --- 2. FIREBASE BRIDGE ---
 if not firebase_admin._apps:
     try:
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"]
@@ -37,14 +37,11 @@ if not firebase_admin._apps:
 
 db = firestore.client()
 
-# --- 3. SESSION STATE ---
-if 'user_id' not in st.session_state:
-    st.session_state.user_id = "suman_naskar_admin" 
+# --- 3. SESSION ---
+if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin" 
+if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-if 'current_data' not in st.session_state:
-    st.session_state.current_data = None
-
-# --- 4. ENGINES ---
+# --- 4. API ENGINES ---
 try:
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
@@ -52,52 +49,45 @@ try:
 except:
     st.warning("⚠️ Checking API Keys...")
 
-# --- 5. ASTROLOGY ENGINE (FIXED FOR VEDIC LAGNA) ---
-
+# --- 5. ASTROLOGY ENGINE (Native Sidereal) ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
-    # Set Sidereal Mode (Lahiri)
+    # 1. Set Global Sidereal Mode (Lahiri is standard)
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     
-    # Convert Time to UTC
+    # 2. Time Conversion
     local_dt = datetime.datetime.combine(dt, tm)
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # --- THE VEDIC LAGNA FIX ---
-    # 1. Get the Ayanamsa (The difference between Western & Vedic)
-    ayanamsa = swe.get_ayanamsa_ut(jd)
+    # 3. Flags for Calculation
+    # swe.FLG_SIDEREAL (64*1024) + swe.FLG_SWIEPH (2)
+    calc_flag = 64 * 1024 + 2 
     
-    # 2. Calculate Houses (Standard usually returns Tropical)
-    cusps, ascmc = swe.houses(jd, lat, lon, b'P')
-    asc_tropical = ascmc[0]
-    
-    # 3. Manually subtract Ayanamsa to force it to Vedic
-    asc_sidereal = (asc_tropical - ayanamsa) % 360
+    # 4. Calculate Lagna (Ascendant)
+    # We pass the Sidereal Flag HERE to get the correct Vedic House Cusp
+    cusps, ascmc = swe.houses(jd, lat, lon, b'P', calc_flag)
+    asc_deg = ascmc[0] # This is now natively Sidereal
     
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    lagna_sign = zodiac[int(asc_sidereal // 30)]
+    lagna_sign = zodiac[int(asc_deg // 30)]
     
-    # --- PLANETS (Use Sidereal Flag) ---
-    # Note: 64*1024 is the flag for Sidereal calculations in Swiss Ephemeris
-    SIDEREAL_FLAG = 64 * 1024 
-    
+    # 5. Calculate Planets
     planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
     results = []
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
     for p, pid in planet_map.items():
-        # Calculate planet position with Sidereal Flag
-        pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
+        pos = swe.calc_ut(jd, pid, calc_flag)[0][0]
         sign = zodiac[int(pos // 30)]
-        degree = pos % 30
+        deg = pos % 30
         nak = nak_list[int(pos / (360/27))]
         
-        results.append(f"{p}: {sign} ({degree:.2f}°) | {nak}")
+        results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
         
         if p == "Moon":
             user_rashi = sign
@@ -107,13 +97,13 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     
     return {
         "Name": name, "Gender": gender, 
-        "Lagna": lagna_sign, # Now correctly shifted!
+        "Lagna": lagna_sign, 
         "Rashi": user_rashi, "Nakshatra": user_nak, 
         "Gana": gana, "Yoni": yoni, "City": city, 
         "Full_Chart": "\n".join(results)
     }
 
-# --- 6. SIDEBAR: UI ---
+# --- 6. SIDEBAR ---
 with st.sidebar:
     st.header("✨ Create Profile")
     n_in = st.text_input("Full Name")
@@ -124,7 +114,7 @@ with st.sidebar:
     with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=15)
     with c2: mn_in = st.selectbox("Minute", range(60), index=45)
     
-    city_in = st.text_input("Birth City", value="Kolkata, India", help="Type any city name")
+    city_in = st.text_input("Birth City", value="Kolkata, India", help="Type exact city name")
 
     if st.button("🔮 Generate Kundali"):
         with st.spinner("Aligning Stars..."):
@@ -136,12 +126,12 @@ with st.sidebar:
                 
                 chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
-                # Save to Firebase
+                # Silent Save
                 try:
                     user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
                     user_ref.document(n_in).set(chart)
                 except Exception as e:
-                    st.warning(f"Cloud Save Issue: {e}")
+                    st.warning(f"Save Error: {e}")
                 
                 st.session_state.current_data = chart
                 st.rerun()
@@ -162,7 +152,7 @@ with st.sidebar:
         if st.button("Load"):
             st.session_state.current_data = next(p for p in profiles if p['Name'] == selected)
 
-# --- 7. MAIN DASHBOARD ---
+# --- 7. UI ---
 st.title("☸️ TaraVaani")
 
 if st.session_state.get('current_data'):
@@ -170,14 +160,14 @@ if st.session_state.get('current_data'):
     st.success(f"Janma Kundali: {d['Name']} 🙏")
     
     cols = st.columns(5)
-    cols[0].metric("Lagna (Ascendant)", d['Lagna'])
-    cols[1].metric("Rashi (Moon Sign)", d['Rashi'])
+    cols[0].metric("Lagna", d['Lagna'])
+    cols[1].metric("Rashi", d['Rashi'])
     cols[2].metric("Nakshatra", d['Nakshatra'])
     cols[3].metric("Gana", d['Gana'])
     cols[4].metric("Yoni", d['Yoni'])
     
     st.divider()
-    st.subheader("📜 Graha Spashta (Planetary Degrees)")
+    st.subheader("📜 Planetary Degrees")
     st.code(d['Full_Chart'], language="text")
 else:
-    st.info("👈 Please enter birth details in the sidebar to generate a Kundali.")
+    st.info("👈 Please enter birth details in the sidebar.")

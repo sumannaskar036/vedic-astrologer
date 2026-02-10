@@ -69,5 +69,108 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, time_adj_mins=0)
     asc_deg = (ascmc[0] - ayanamsa) % 360
     
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
+    
+    # --- THIS WAS THE BROKEN LINE (Fixed now) ---
     lagna_sign = zodiac[int(asc_deg // 30)]
-    lagna_val = asc_deg %
+    lagna_val = asc_deg % 30 
+    
+    planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
+    results = []
+    user_rashi, user_nak = "", ""
+    nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
+
+    SIDEREAL_FLAG = 64 * 1024
+    for p, pid in planet_map.items():
+        try:
+            pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
+            sign = zodiac[int(pos // 30) % 12]
+            deg = pos % 30
+            nak_idx = int(pos / (360/27)) % 27
+            nak = nak_list[nak_idx]
+            results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
+            if p == "Moon": user_rashi, user_nak = sign, nak
+        except:
+            results.append(f"{p}: Error")
+            
+    gana, yoni = get_gana_yoni(user_nak)
+    
+    return {
+        "Name": name, "Gender": gender,
+        "Lagna": lagna_sign, "Lagna_Deg": f"{lagna_val:.2f}",
+        "Rashi": user_rashi, "Nakshatra": user_nak,
+        "Gana": gana, "Yoni": yoni, "City": city,
+        "Full_Chart": "\n".join(results)
+    }
+
+# --- 6. SIDEBAR ---
+with st.sidebar:
+    st.header("✨ Create Profile")
+    n_in = st.text_input("Full Name")
+    g_in = st.selectbox("Gender", ["Male", "Female"])
+    d_in = st.date_input("Date of Birth", value=datetime.date(1969, 3, 16), min_value=datetime.date(1900, 1, 1), format="DD/MM/YYYY")
+    
+    c1, c2 = st.columns(2)
+    with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=4)
+    with c2: mn_in = st.selectbox("Minute", range(60), index=30)
+    
+    city_in = st.text_input("Birth City", value="Kolkata, India", help="Type exact city name")
+
+    st.divider()
+    
+    # --- ADVANCED ACCURACY SLIDER ---
+    with st.expander("🛠️ Advanced Accuracy"):
+        st.caption("Use this if your chart differs from the calculation (e.g., Lagna border).")
+        time_adj = st.slider("Fine-tune Time (Minutes)", -15, 15, 0)
+
+    if st.button("🔮 Generate Kundali"):
+        with st.spinner("Aligning Stars..."):
+            res = geocoder.geocode(city_in)
+            if res:
+                lat = res[0]['geometry']['lat']
+                lng = res[0]['geometry']['lng']
+                formatted_city = res[0]['formatted']
+                
+                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city, time_adj)
+                
+                try:
+                    user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+                    user_ref.document(n_in).set(chart)
+                except: pass
+                
+                st.session_state.current_data = chart
+                st.rerun()
+            else:
+                st.error("City not found.")
+
+    st.divider()
+    st.subheader("📂 Saved Profiles")
+    try:
+        user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+        profiles = [doc.to_dict() for doc in user_ref.stream()]
+    except: profiles = []
+
+    if profiles:
+        selected_prof = st.selectbox("Load Profile", [p['Name'] for p in profiles])
+        if st.button("Load"):
+            found = next((p for p in profiles if p['Name'] == selected_prof), None)
+            if found: st.session_state.current_data = found
+
+# --- 7. UI ---
+st.title("☸️ TaraVaani")
+
+if st.session_state.get('current_data'):
+    d = st.session_state.current_data
+    st.success(f"Janma Kundali: {d['Name']} 🙏")
+    
+    cols = st.columns(5)
+    cols[0].metric("Lagna", f"{d['Lagna']} ({d.get('Lagna_Deg', '')}°)")
+    cols[1].metric("Rashi", d['Rashi'])
+    cols[2].metric("Nakshatra", d['Nakshatra'])
+    cols[3].metric("Gana", d['Gana'])
+    cols[4].metric("Yoni", d['Yoni'])
+    
+    st.divider()
+    st.subheader("📜 Planetary Degrees")
+    st.code(d['Full_Chart'], language="text")
+else:
+    st.info("👈 Please enter birth details in the sidebar.")

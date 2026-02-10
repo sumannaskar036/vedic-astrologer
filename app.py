@@ -5,6 +5,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
 import requests
+from openai import OpenAI   # ✅ ADDED (only new import)
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
@@ -154,13 +155,16 @@ with st.sidebar:
     )
 
     st.header("Create Profile")
-    n_in = st.text_input("Full Name", "Suman Naskar")
+    n_in = st.text_input("Full Name", "")
     g_in = st.selectbox("Gender", ["Male","Female"])
-    d_in = st.date_input("Date of Birth", datetime.date(1993,4,23), format="DD/MM/YYYY")
-
+    d_in = st.date_input(
+    "Date of Birth",
+    value=datetime.date.today(),
+    format="DD/MM/YYYY"
+)
     c1, c2 = st.columns(2)
-    with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=15)
-    with c2: mn_in = st.selectbox("Minute", range(60), index=45)
+    with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=0, help="Birth hour")
+    with c2: mn_in = st.selectbox("Minute", range(60), index=0, help="Birth minute")
 
     city_in = st.text_input("Birth City", "Kolkata, India")
 
@@ -171,6 +175,9 @@ with st.sidebar:
         )
 
     if st.button("Generate Kundali", type="primary"):
+        if not n_in.strip():
+            st.error("Please enter your full name.")
+            st.stop()
         with st.spinner("Calculating..."):
             res = geocoder.geocode(city_in)
             if res:
@@ -222,29 +229,19 @@ IMPORTANT: Write response in {lang_opt} language.
 Style: Mystic, positive, clear. Use bullet points.
 """
 
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+        # ✅ GPT-4o-mini (Gemini fully removed)
+        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-        payload = {
-            "contents": [{
-                "role": "user",
-                "parts": [{"text": prompt}]
-            }]
-        }
-
-        response = requests.post(
-            url,
-            headers={"Content-Type": "application/json"},
-            params={"key": st.secrets["GEMINI_API_KEY"]},
-            json=payload,
-            timeout=30
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
         )
 
-        data = response.json()
-        st.subheader("🔍 Gemini Raw Response")
-        st.code(data, language="json")
-
+        st.info(response.choices[0].message.content)
 
 else:
     st.title("☸️ TaraVaani")
     st.info("👈 Please enter birth details in the sidebar to begin.")
+
 

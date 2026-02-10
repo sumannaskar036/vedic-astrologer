@@ -44,25 +44,33 @@ def get_gana_yoni(nakshatra_name):
     return data.get(nakshatra_name, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
-    # 1. SET NIRAYANA (VEDIC) MODE
+    # 1. INITIALIZE VEDIC ENGINE
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     
-    # 2. CONVERT TO JULIAN DAY
+    # 2. CONVERT TIME TO JULIAN DAY
     local_dt = datetime.datetime.combine(dt, tm)
+    # Adjust for IST (UTC+5:30)
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # 3. CALCULATE SIDEREAL HOUSES (The Fix for Capricorn)
-    # Using the specific Sidereal Flag (65536) ensures math starts from Vedic 0°
-    SEFLG_SIDEREAL = 64 * 1024 
-    cusps, ascmc = swe.houses_ex(jd, lat, lon, b'P', SEFLG_SIDEREAL)
+    # 3. GET THE AYANAMSA (The secret to shifting from Aquarius to Capricorn)
+    # This value is approx 23.4 degrees for 1969
+    ayanamsa = swe.get_ayanamsa_ut(jd)
     
-    asc_degree = ascmc[0]
+    # 4. CALCULATE HOUSES (Tropical first)
+    cusps, ascmc = swe.houses(jd, lat, lon, b'P')
+    
+    # 5. MANUALLY SHIFT TO SIDEREAL (The Absolute Fix)
+    # (Tropical Ascendant - Ayanamsa) = Vedic Ascendant
+    asc_sidereal = (ascmc[0] - ayanamsa) % 360
+    
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", 
               "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    lagna_sign = zodiac[int(asc_degree // 30)]
     
-    # 4. PLANETARY POSITIONS (Force Sidereal)
+    lagna_sign = zodiac[int(asc_sidereal // 30)]
+    
+    # 6. PLANETARY POSITIONS (Force Sidereal Flag 65536)
+    SIDEREAL_FLAG = 64 * 1024
     planet_map = {"Sun": swe.SUN, "Moon": swe.MOON, "Mars": swe.MARS, "Mercury": swe.MERCURY, 
                   "Jupiter": swe.JUPITER, "Venus": swe.VENUS, "Saturn": swe.SATURN, 
                   "Rahu": swe.MEAN_NODE, "Ketu": swe.MEAN_NODE}
@@ -70,6 +78,21 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     results = []
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
+
+    for p, pid in planet_map.items():
+        # Get planetary position using the sidereal flag
+        pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
+        if p == "Ketu": pos = (pos + 180) % 360
+        
+        sign = zodiac[int(pos // 30)]
+        nak = nak_list[int(pos / (360/27))]
+        results.append(f"{p}: {sign} ({pos % 30:.2f}°) | {nak}")
+        
+        if p == "Moon":
+            user_rashi, user_nak = sign, nak
+            
+    gana, yoni = get_gana_yoni(user_nak)
+    return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)}
 
     for p, pid in planet_map.items():
         pos = swe.calc_ut(jd, pid, SEFLG_SIDEREAL)[0][0]

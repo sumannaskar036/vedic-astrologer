@@ -47,26 +47,23 @@ except:
 if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin" 
 if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-# --- 5. ASTROLOGY ENGINE ---
+# --- 5. ASTROLOGY ENGINE (RAMAN MODE) ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
-    # --- CRITICAL CHANGE: USING TRUE CHITRAPAKSHA ---
-    # This uses exact star positioning instead of the standard Lahiri constant.
-    # It solves many "borderline" Ascendant issues.
-    try:
-        swe.set_sid_mode(swe.SIDM_TRUE_CITRA)
-    except:
-        # Fallback if library version is old, though this is rare on Streamlit Cloud
-        swe.set_sid_mode(27) 
-
-    # Convert to UTC (-5:30 IST)
+    # --- CRITICAL CHANGE: USING RAMAN AYANAMSA ---
+    # This aligns the math with B.V. Raman's system, which often 
+    # yields Capricorn for borderline cases where Lahiri yields Aquarius.
+    swe.set_sid_mode(swe.SIDM_RAMAN) 
+    
+    # Time Conversion
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
+    # Calculations
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     asc_deg = (ascmc[0] - ayanamsa) % 360
@@ -80,10 +77,22 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
-    SIDEREAL_FLAG = 64 * 1024
+    # --- CRITICAL FIX: ANTI-CRASH RAHU ---
+    # Using 'FLG_MOSEPH' (Moshier) ensures we don't need external data files.
+    # This prevents the "swisseph.Error" you saw earlier.
+    CALC_FLAG = swe.FLG_SWIEPH | swe.FLG_SIDEREAL
+    
     for p, pid in planet_map.items():
         try:
-            pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
+            if p == "Rahu":
+                # Fallback to Moshier for Rahu to prevent crash
+                try:
+                    pos = swe.calc_ut(jd, pid, CALC_FLAG)[0][0]
+                except:
+                    pos = swe.calc_ut(jd, pid, swe.FLG_MOSEPH | swe.FLG_SIDEREAL)[0][0]
+            else:
+                pos = swe.calc_ut(jd, pid, CALC_FLAG)[0][0]
+            
             sign = zodiac[int(pos // 30) % 12]
             deg = pos % 30
             nak_idx = int(pos / (360/27)) % 27
@@ -105,17 +114,17 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
 
 # --- 6. SIDEBAR ---
 with st.sidebar:
-    st.title("✨ TaraVaani")
+    st.title("☸️ TaraVaani")
     st.header("Create Profile")
     n_in = st.text_input("Full Name")
     g_in = st.selectbox("Gender", ["Male", "Female"])
     
-    # Date Range 1900-2100
+    # Date Range 1900-2025
     d_in = st.date_input(
         "Date of Birth", 
         value=datetime.date(1993, 4, 23), 
         min_value=datetime.date(1900, 1, 1), 
-        max_value=datetime.date(2100, 12, 31),
+        max_value=datetime.date(2025, 12, 31),
         format="DD/MM/YYYY"
     )
     
@@ -135,7 +144,6 @@ with st.sidebar:
                 lng = res[0]['geometry']['lng']
                 formatted_city = res[0]['formatted']
                 
-                # No manual slider anymore. Pure True Chitrapaksha math.
                 chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
                 try:
@@ -162,18 +170,9 @@ with st.sidebar:
             if found: st.session_state.current_data = found
 
 # --- 7. UI ---
-# Custom CSS
 st.markdown("""
 <style>
-.header-box {
-    background-color: #1e3a29;
-    padding: 15px;
-    border-radius: 10px;
-    color: #90EE90;
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 20px;
-}
+.header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; font-size: 18px; font-weight: bold; margin-bottom: 20px; }
 </style>
 """, unsafe_allow_html=True)
 

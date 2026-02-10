@@ -1,6 +1,6 @@
 import streamlit as st
 import google.generativeai as genai
-import swisseph as swe
+import pyswisseph as swe
 import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore

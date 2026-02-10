@@ -7,62 +7,34 @@ from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
 import time
 
-# --- 1. APP CONFIGURATION ---
+# --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="centered", initial_sidebar_state="collapsed")
 
-# --- 2. MOBILE-FIRST CSS ---
-st.markdown("""
+# --- 2. SESSION STATE ---
+if 'user_id' not in st.session_state: st.session_state.user_id = None
+if 'onboarding_complete' not in st.session_state: st.session_state.onboarding_complete = False
+if 'active_profile' not in st.session_state: st.session_state.active_profile = None 
+if 'page_view' not in st.session_state: st.session_state.page_view = "Home"
+if 'wallet' not in st.session_state: st.session_state.wallet = 0
+if 'chat_history' not in st.session_state: st.session_state.chat_history = []
+
+# --- 3. SMART CSS ENGINE ---
+# Base CSS (Always Active)
+base_css = """
 <style>
-    /* RESET & LAYOUT */
     .stApp { background-color: #121212; color: #E0E0E0; font-family: sans-serif; }
+    
+    /* Remove default Streamlit padding */
     .block-container {
         padding-top: 0rem !important;
-        padding-bottom: 6rem !important;
+        padding-bottom: 8rem !important; /* Extra space for bottom nav + chat input */
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
     }
-    
-    /* FORCE SIDE-BY-SIDE COLUMNS ON MOBILE */
-    div[data-testid="column"] {
-        width: 50% !important;
-        flex: 1 1 50% !important;
-        min-width: 50% !important;
-    }
-    
-    /* HERO BUTTONS (RED CARDS) */
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%) !important;
-        border: none !important;
-        border-radius: 15px !important;
-        height: 120px !important;
-        white-space: pre-wrap !important;
-        color: white !important;
-        box-shadow: 0 4px 10px rgba(211, 47, 47, 0.4) !important;
-        font-weight: bold !important;
-        font-size: 16px !important;
-        width: 100% !important;
-    }
-    
-    /* PROFILE SCROLL */
-    .profile-scroll {
-        display: flex; overflow-x: auto; gap: 10px; padding: 10px 5px;
-        scrollbar-width: none; margin-bottom: 10px;
-    }
-    .profile-scroll::-webkit-scrollbar { display: none; }
-    
-    /* Secondary Buttons (Pills) */
-    div.stButton > button[kind="secondary"] {
-        background-color: #2D2D2D !important;
-        color: #B0BEC5 !important;
-        border: 1px solid #444 !important;
-        border-radius: 20px !important;
-        height: 40px !important;
-        font-size: 13px !important;
-    }
-    
-    /* TOP HEADER */
+
+    /* Fixed Top Header */
     .top-header {
-        position: sticky; top: 0; z-index: 999;
+        position: sticky; top: 0; z-index: 50;
         background-color: #F8BBD0; color: #880E4F;
         padding: 15px 20px; margin: 0 -0.5rem 1rem -0.5rem;
         display: flex; justify-content: space-between; align-items: center;
@@ -70,18 +42,68 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
     
-    /* INPUTS & TABS */
+    /* Input Fields styling */
     div[data-baseweb="input"] { background-color: #2D2D2D !important; border: none; border-radius: 10px; color: white; }
     div[data-baseweb="select"] > div { background-color: #2D2D2D !important; border-radius: 10px; }
-    .stTabs [data-baseweb="tab-list"] { background-color: #1E1E1E; padding: 5px; border-radius: 10px; }
-    .stTabs [aria-selected="true"] { background-color: #D32F2F !important; color: white !important; }
     
     /* Hide Defaults */
     #MainMenu, footer, header {visibility: hidden;}
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(base_css, unsafe_allow_html=True)
 
-# --- 3. DATABASE ---
+# PAGE SPECIFIC CSS
+if not st.session_state.onboarding_complete:
+    # ONBOARDING CSS: Normal Red Buttons
+    st.markdown("""
+    <style>
+        div.stButton > button[kind="primary"] {
+            background-color: #D32F2F !important;
+            border: none !important; border-radius: 10px !important;
+            height: 50px !important; width: 100% !important;
+            font-size: 16px !important; font-weight: bold !important;
+            color: white !important;
+        }
+    </style>""", unsafe_allow_html=True)
+
+elif st.session_state.page_view == "Home":
+    # HOME CSS: Big Red Cards for Primary Buttons
+    st.markdown("""
+    <style>
+        /* Force 2-Column Grid for Hero Cards */
+        div[data-testid="column"] { width: 50% !important; flex: 1 1 50% !important; min-width: 50% !important; }
+        
+        /* Big Red Card Style */
+        div.stButton > button[kind="primary"] {
+            background: linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%) !important;
+            border: none !important; border-radius: 15px !important;
+            height: 110px !important; width: 100% !important;
+            font-size: 16px !important; font-weight: bold !important;
+            color: white !important; white-space: pre-wrap !important;
+            box-shadow: 0 4px 10px rgba(211, 47, 47, 0.4) !important;
+            margin-bottom: 0px !important;
+        }
+        
+        /* Secondary Pills */
+        div.stButton > button[kind="secondary"] {
+            background-color: #2D2D2D !important; border-radius: 20px !important;
+            height: 35px !important; font-size: 12px !important;
+            border: 1px solid #444 !important; color: #B0BEC5 !important;
+        }
+    </style>""", unsafe_allow_html=True)
+
+else:
+    # OTHER PAGES: Normal Buttons
+    st.markdown("""
+    <style>
+        div.stButton > button {
+            border-radius: 10px !important; height: 45px !important;
+            font-weight: bold !important;
+        }
+    </style>""", unsafe_allow_html=True)
+
+
+# --- 4. BACKEND SETUP ---
 if not firebase_admin._apps:
     try:
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"].replace("\\n", "\n")
@@ -107,30 +129,13 @@ try:
     model = genai.GenerativeModel('gemini-1.5-flash')
 except: pass
 
-# --- 4. SESSION MANAGEMENT (THE FIX) ---
-# Check URL for user_id to simulate persistence
-query_params = st.query_params
-url_uid = query_params.get("uid", None)
-
-if 'user_id' not in st.session_state:
-    if url_uid:
-        st.session_state.user_id = url_uid
-        st.session_state.onboarding_complete = True
-    else:
-        st.session_state.user_id = None
-        st.session_state.onboarding_complete = False
-
-if 'active_profile' not in st.session_state: st.session_state.active_profile = None 
-if 'page_view' not in st.session_state: st.session_state.page_view = "Home"
-if 'wallet' not in st.session_state: st.session_state.wallet = 0
-
-# --- 5. ENGINE ---
+# --- 5. LOGIC FUNCTIONS ---
 def calculate_chart(name, gender, dt, tm, city):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     try:
         res = geocoder.geocode(city)
         lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
-    except: lat, lng = 22.57, 88.36 
+    except: lat, lng = 28.61, 77.20 
     
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
@@ -169,120 +174,102 @@ def get_profs(uid):
         return [d.to_dict() for d in docs]
     except: return []
 
-# --- 6. ONBOARDING (LOGIN / SIGNUP) ---
-if not st.session_state.onboarding_complete:
+# --- 6. VIEW: ONBOARDING ---
+qp = st.query_params
+url_uid = qp.get("uid", None)
+
+if not st.session_state.onboarding_complete and not url_uid:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("<h1 style='text-align: center; color: #F8BBD0;'>☸️ TaraVaani</h1>", unsafe_allow_html=True)
     
-    tab_login, tab_signup = st.tabs(["Login (Existing)", "Create New"])
-    
-    # LOGIN TAB
-    with tab_login:
-        st.markdown('<div style="background:#1E1E1E; padding:20px; border-radius:15px;">', unsafe_allow_html=True)
-        st.info("Since we don't have OTP yet, enter your 'Full Name' exactly as registered.")
-        login_name = st.text_input("Enter Registered Name")
-        if st.button("Login"):
-            # Simple simulation: search for a doc with this name ID pattern
-            # In production, we'd query Firebase. For now, we reconstruct the ID pattern.
-            # Assuming user didn't clear cache, browser remembers. If strict match:
-            if login_name:
-                # Try to find a user with this name prefix (simplified for prototype)
-                # Ideally, we would query the DB. For now, let's just let them in 
-                # and if data exists, it loads.
-                # Just generating the probable ID
-                uid = f"{login_name.replace(' ', '_')}" 
-                # Note: Time stamp makes strict retrieval hard without real auth. 
-                # For this demo, we will just start a session.
-                # BETTER: Just ask them to recreate or rely on URL.
-                st.warning("For this demo, please check your URL. If ?uid=... is missing, create a new profile.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    # SIGNUP TAB
-    with tab_signup:
-        with st.container():
-            st.markdown('<div style="background:#1E1E1E; padding:20px; border-radius:15px;">', unsafe_allow_html=True)
-            name = st.text_input("Full Name")
+    with st.container():
+        st.markdown('<div style="background:#1E1E1E; padding:20px; border-radius:15px; margin-top:10px;">', unsafe_allow_html=True)
+        
+        tab_new, tab_log = st.tabs(["Create New", "Login"])
+        
+        with tab_new:
+            name = st.text_input("Full Name", placeholder="e.g. Suman Naskar")
             gender = st.selectbox("Gender", ["Male", "Female"])
+            dob = st.date_input("Date", value=datetime.date(1995, 1, 1), min_value=datetime.date(1900,1,1), max_value=datetime.date(2100,12,31), format="DD/MM/YYYY")
             
             c1, c2 = st.columns(2)
-            dob = c1.date_input("Date", datetime.date(1995,1,1), min_value=datetime.date(1900,1,1), max_value=datetime.date(2100,12,31), format="DD/MM/YYYY")
-            with c2:
-                st.write("Time")
-                hc, mc = st.columns(2)
-                hr = hc.number_input("Hr", 0, 23, 10, label_visibility="collapsed")
-                mn = mc.number_input("Min", 0, 59, 30, label_visibility="collapsed")
+            hr = c1.selectbox("Hour", range(24), index=10)
+            mn = c2.selectbox("Minute", range(60), index=30)
             
             city = st.text_input("City", "New Delhi, India")
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # Button is RED and NORMAL size here due to CSS logic
             if st.button("Start Journey 🚀", type="primary"):
                 if name:
-                    # Create UID without timestamp for easier login prediction if needed
-                    # But keeping it unique is safer for DB.
                     uid = f"{name.replace(' ', '_')}_{int(time.time())}"
-                    
                     try:
                         chart = calculate_chart(name, gender, dob, datetime.time(hr, mn), city)
                         db.collection("users").document(uid).collection("profiles").document(name).set(chart)
-                        
-                        # SET SESSION & URL
                         st.session_state.user_id = uid
                         st.session_state.active_profile = chart
                         st.session_state.onboarding_complete = True
-                        st.query_params["uid"] = uid # <--- MAGIC LINE: SAVES TO URL
+                        st.query_params["uid"] = uid
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
-            st.markdown('</div>', unsafe_allow_html=True)
+                    except Exception as e: st.error(f"Error: {e}")
 
-# --- 7. MAIN APP ---
+        with tab_log:
+            uid_in = st.text_input("User ID (from URL)")
+            if st.button("Login"):
+                if uid_in:
+                    st.session_state.user_id = uid_in
+                    st.session_state.onboarding_complete = True
+                    st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# --- 7. VIEW: MAIN APP ---
 else:
+    if url_uid and not st.session_state.user_id:
+        st.session_state.user_id = url_uid
+        st.session_state.onboarding_complete = True
+
     profs = get_profs(st.session_state.user_id)
     if not st.session_state.active_profile and profs: st.session_state.active_profile = profs[0]
     
     # TOP HEADER
     st.markdown(f"""
     <div class="top-header">
-        <div style="font-size:22px;">☰</div>
-        <div>TaraVaani</div>
-        <div style="background:white; padding:5px 12px; border-radius:15px; font-size:12px; font-weight:800;">
+        <div style="font-size:20px;">☰</div>
+        <div style="font-weight:bold;">TaraVaani</div>
+        <div style="background:white; padding:5px 10px; border-radius:15px; font-size:12px; font-weight:800;">
             ₹{st.session_state.wallet}
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # --- HOME VIEW ---
+    # --- HOME PAGE ---
     if st.session_state.page_view == "Home":
         st.markdown("<br>", unsafe_allow_html=True)
-
-        # A. HERO BUTTONS
+        
+        # HERO CARDS (Big Red due to CSS)
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("🌅\nHoroscope", key="btn_h", type="primary"):
-                st.session_state.show_daily = True
+            if st.button("🌅\nHoroscope", key="h_btn", type="primary"): st.session_state.show_daily = True
         with c2:
-            if st.button("💞\nMatching", key="btn_m", type="primary"):
-                pass 
+            if st.button("💞\nMatching", key="m_btn", type="primary"): pass
 
-        # B. PROFILE SCROLL
+        # PROFILE LIST
         if len(profs) > 1:
-            st.markdown('<p style="color:#888; font-size:12px; margin: 20px 0 5px 5px;">SWITCH PROFILE</p>', unsafe_allow_html=True)
-            st.markdown('<div class="profile-scroll">', unsafe_allow_html=True)
-            
-            p_cols = st.columns(len(profs))
+            st.markdown('<p style="color:#888; font-size:12px; margin: 15px 0 5px 5px;">SWITCH PROFILE</p>', unsafe_allow_html=True)
+            st.markdown('<div style="display:flex; overflow-x:auto; gap:10px; padding-bottom:10px;">', unsafe_allow_html=True)
+            cols = st.columns(len(profs))
             for i, p in enumerate(profs):
                 is_act = (p['Name'] == st.session_state.active_profile['Name'])
                 label = f"◉ {p['Name'].split()[0]}" if is_act else p['Name'].split()[0]
-                if p_cols[i].button(label, key=f"prof_{i}", type="secondary"):
+                if cols[i].button(label, key=f"p_{i}", type="secondary"):
                     st.session_state.active_profile = p
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # C. DATA TABS
+        # DATA AREA
         if st.session_state.active_profile:
             p = st.session_state.active_profile
-            st.markdown(f"<h3 style='margin-top:10px;'>{p['Name']}</h3>", unsafe_allow_html=True)
-            
+            st.markdown(f"### {p['Name']}")
             t1, t2, t3, t4, t5 = st.tabs(["Basic", "Charts", "KP", "Dasha", "Report"])
             
             with t1:
@@ -291,74 +278,86 @@ else:
                 c2.metric("Rashi", p['Rashi'])
                 st.divider()
                 c1.metric("Nakshatra", p['Nakshatra'])
-                c2.caption(f"📅 {p['Date']}")
+                c2.caption(f"📍 {p.get('City', 'India')}")
             
             with t2: st.code(p['Full_Chart'])
             with t3: st.info("KP Coming Soon")
             with t4: st.info("Dasha Coming Soon")
+            
             with t5:
                 q = st.selectbox("Topic", ["Life", "Career", "Love"])
-                if st.button("Ask AI", type="secondary"):
-                    with st.spinner("..."):
+                if st.button("Ask AI", type="secondary"): # Secondary = Dark Pill
+                    with st.spinner("Connecting..."):
                         try:
-                            res = model.generate_content(f"Analyze: {p['Full_Chart']} for {q}")
-                            st.write(res.text)
-                        except: st.error("AI Busy")
+                            # SAFE CHECK FOR AI
+                            if 'gemini-1.5-flash' in str(model):
+                                res = model.generate_content(f"Analyze: {p['Full_Chart']} for {q}")
+                                st.write(res.text)
+                            else:
+                                st.error("AI Key Missing")
+                        except Exception as e: st.error("AI sleeping. Wake it up later.")
 
         if st.session_state.get('show_daily'):
             with st.expander("Today's Forecast", expanded=True):
-                st.info("Today is a day of power.")
-                if st.button("Close", type="secondary"): st.session_state.show_daily = False; st.rerun()
+                st.info("A powerful day for growth.")
+                if st.button("Close"): st.session_state.show_daily = False; st.rerun()
 
-    # --- CHAT VIEW ---
+    # --- CHAT PAGE ---
     elif st.session_state.page_view == "Chat":
         st.subheader("💬 AI Astrologer")
-        if "msgs" not in st.session_state: st.session_state.msgs = []
-        for m in st.session_state.msgs:
+        
+        # Chat History
+        for m in st.session_state.chat_history:
             with st.chat_message(m["role"]): st.write(m["content"])
             
-        if user_in := st.chat_input("Ask question..."):
-            st.session_state.msgs.append({"role":"user", "content":user_in})
-            with st.chat_message("user"): st.write(user_in)
+        # Chat Input
+        if prompt := st.chat_input("Ask about your chart..."):
+            st.session_state.chat_history.append({"role":"user", "content":prompt})
+            with st.chat_message("user"): st.write(prompt)
+            
             with st.chat_message("assistant"):
-                p = st.session_state.active_profile
-                final_q = f"Context: {p['Name']}, {p['Lagna']} Lagna. Q: {user_in}"
                 try:
-                    ans = model.generate_content(final_q).text
-                    st.write(ans)
-                    st.session_state.msgs.append({"role":"assistant", "content":ans})
-                except: st.error("AI Error")
+                    p = st.session_state.active_profile
+                    # Handle if p is None (Fresh user, no profile yet)
+                    if p:
+                        ctx = f"Context: {p['Name']}, {p['Lagna']} Lagna. Q: {prompt}"
+                        res = model.generate_content(ctx)
+                        st.write(res.text)
+                        st.session_state.chat_history.append({"role":"assistant", "content":res.text})
+                    else:
+                        st.error("Please create a profile first.")
+                except: st.error("AI Error. Check API Key.")
 
-    # --- PROFILE VIEW ---
+    # --- PROFILE PAGE ---
     elif st.session_state.page_view == "Profile":
         st.subheader("👤 Settings")
         st.metric("Wallet", f"₹{st.session_state.wallet}")
         
         with st.expander("Add New Profile"):
-            with st.form("add"):
-                n = st.text_input("Name")
-                g = st.selectbox("Gender", ["Male", "Female"])
-                d = st.date_input("Date")
-                c1, c2 = st.columns(2)
-                h = c1.number_input("Hr", 0, 23)
-                m = c2.number_input("Min", 0, 59)
-                ci = st.text_input("City", "Mumbai")
-                if st.form_submit_button("Add", type="primary"):
-                    try:
-                        ch = calculate_chart(n, g, d, datetime.time(h,m), ci)
-                        db.collection("users").document(st.session_state.user_id).collection("profiles").document(n).set(ch)
-                        st.success("Added!"); time.sleep(1); st.rerun()
-                    except: st.error("Error creating profile")
+            n = st.text_input("Name")
+            g = st.selectbox("Gender", ["Male", "Female"])
+            d = st.date_input("Date")
+            c1, c2 = st.columns(2)
+            h = c1.selectbox("Hr", range(24))
+            m = c2.selectbox("Mn", range(60))
+            ci = st.text_input("City", "Mumbai")
+            
+            if st.button("Add Profile"):
+                ch = calculate_chart(n, g, d, datetime.time(h,m), ci)
+                db.collection("users").document(st.session_state.user_id).collection("profiles").document(n).set(ch)
+                st.success("Added!"); st.rerun()
 
-    # --- BOTTOM NAV ---
-    st.markdown('<div class="bottom-nav-spacer"></div>', unsafe_allow_html=True)
+    # --- BOTTOM NAV (STICKY & ABOVE CHAT) ---
     c1, c2, c3 = st.columns(3)
     
-    # We use simple buttons with 'secondary' style.
-    # To show 'active', we just bold the text or add an emoji indicator
-    def nav_lbl(txt, view):
-        return f"📍 {txt}" if st.session_state.page_view == view else txt
+    # We use Custom CSS to define .bottom-nav but we need to inject buttons into it?
+    # Streamlit doesn't support moving buttons into divs.
+    # We just place them at the end. The spacing is handled by .block-container padding-bottom
+    
+    st.markdown("---")
+    # Simple Text Buttons for Nav
+    def nav_lbl(txt, view): return f"📍 {txt}" if st.session_state.page_view == view else txt
 
-    if c1.button(nav_lbl("Home", "Home"), use_container_width=True, type="secondary"): st.session_state.page_view="Home"; st.rerun()
-    if c2.button(nav_lbl("Chat", "Chat"), use_container_width=True, type="secondary"): st.session_state.page_view="Chat"; st.rerun()
-    if c3.button(nav_lbl("Profile", "Profile"), use_container_width=True, type="secondary"): st.session_state.page_view="Profile"; st.rerun()
+    if c1.button(nav_lbl("Home", "Home"), use_container_width=True): st.session_state.page_view="Home"; st.rerun()
+    if c2.button(nav_lbl("Chat", "Chat"), use_container_width=True): st.session_state.page_view="Chat"; st.rerun()
+    if c3.button(nav_lbl("Profile", "Profile"), use_container_width=True): st.session_state.page_view="Profile"; st.rerun()

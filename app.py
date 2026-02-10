@@ -53,15 +53,14 @@ def get_gana_yoni(nak):
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
-    # --- AYANAMSA SELECTION (Fixed KP Crash) ---
+    # --- AYANAMSA SELECTION (Fixed logic using Integers) ---
     if "Lahiri" in ayanamsa_mode:
         swe.set_sid_mode(swe.SIDM_LAHIRI)
     elif "Raman" in ayanamsa_mode:
         swe.set_sid_mode(swe.SIDM_RAMAN)
     elif "KP" in ayanamsa_mode:
-        # We use integer 5 because 'swe.SIDM_KP' is missing in some cloud versions
-        swe.set_sid_mode(5) 
-
+        swe.set_sid_mode(5) # Integer 5 represents KP New
+    
     # 1. Time Conversion
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
@@ -120,7 +119,7 @@ with st.sidebar:
         "Date of Birth", 
         value=datetime.date(1993, 4, 23), 
         min_value=datetime.date(1900, 1, 1), 
-        max_value=datetime.date(2100, 12, 31),
+        max_value=datetime.date(2025, 12, 31),
         format="DD/MM/YYYY"
     )
     
@@ -184,7 +183,17 @@ if st.session_state.get('current_data'):
     
     st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
     
-    c1, c2, c3, c4, c5 = st.columns(5)
+    # --- Columns defined cleanly here ---
+    col1, col2, col3, col4, col5 = st.columns(5)
     
-    # --- UI CLEANUP: Removed degrees from Lagna display ---
-    c
+    col1.metric("Lagna", d['Lagna'])
+    col2.metric("Rashi", d['Rashi'])
+    col3.metric("Nakshatra", d['Nakshatra'])
+    col4.metric("Gana", d['Gana'])
+    col5.metric("Yoni", d['Yoni'])
+    
+    st.divider()
+    st.subheader("📜 Planetary Degrees")
+    st.code(d['Full_Chart'], language="text")
+else:
+    st.info("👈 Please enter birth details in the sidebar.")

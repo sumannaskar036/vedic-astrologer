@@ -4,12 +4,12 @@ import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
-import google.generativeai as genai  # IMPORTED OFFICIAL SDK
+import google.generativeai as genai
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS
+# Custom CSS for UI
 st.markdown("""
 <style>
     .header-box { 
@@ -23,7 +23,6 @@ st.markdown("""
         text-align: center;
     }
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
-    .stChatInput { position: fixed; bottom: 0; padding-bottom: 15px; z-index: 1000; background: #0E1117; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -45,22 +44,36 @@ if not firebase_admin._apps:
             "universe_domain": "googleapis.com"
         }
         firebase_admin.initialize_app(credentials.Certificate(cred_info))
-    except Exception as e: pass
+    except Exception as e:
+        pass
 
 db = firestore.client()
 
 # --- 3. API SETUP ---
 try:
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
-except: pass
+except:
+    pass
 
 # --- 4. SESSION STATE ---
-if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin"
-if 'current_data' not in st.session_state: st.session_state.current_data = None
+if 'user_id' not in st.session_state: 
+    st.session_state.user_id = "suman_naskar_admin"
+if 'current_data' not in st.session_state: 
+    st.session_state.current_data = None
 
 # --- 5. CALCULATOR ENGINE ---
 def get_gana_yoni(nak):
-    data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
+    data = {
+        "Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), 
+        "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), 
+        "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), 
+        "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), 
+        "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), 
+        "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), 
+        "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), 
+        "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), 
+        "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")
+    }
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
@@ -92,7 +105,8 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
             nak = nak_list[nak_idx]
             results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
             if p == "Moon": user_rashi, user_nak = sign, nak
-        except: results.append(f"{p}: Error")
+        except:
+            results.append(f"{p}: Error")
 
     gana, yoni = get_gana_yoni(user_nak)
     return {
@@ -105,7 +119,6 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
 with st.sidebar:
     st.title("☸️ TaraVaani")
     
-    # Language Selector
     st.markdown("### 🗣️ AI Language")
     lang_opt = st.selectbox(
         "Select output language",
@@ -142,13 +155,11 @@ with st.sidebar:
                 if res:
                     lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
                     fmt_city = res[0]['formatted']
-                    
                     chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, fmt_city, ayanamsa_opt)
-                    
                     try:
                         db.collection("users").document(st.session_state.user_id).collection("profiles").document(n_in).set(chart)
-                    except: pass
-                    
+                    except:
+                        pass
                     st.session_state.current_data = chart
                     st.rerun()
                 else:
@@ -161,15 +172,18 @@ with st.sidebar:
     try:
         docs = db.collection("users").document(st.session_state.user_id).collection("profiles").stream()
         profiles = [d.to_dict() for d in docs]
-    except: profiles = []
+    except:
+        profiles = []
     
     if profiles:
         sel_prof = st.selectbox("Select", [p['Name'] for p in profiles], label_visibility="collapsed")
         if st.button("Load"):
             found = next((p for p in profiles if p['Name'] == sel_prof), None)
-            if found: st.session_state.current_data = found; st.rerun()
+            if found:
+                st.session_state.current_data = found
+                st.rerun()
 
-# --- 7. MAIN UI (UPDATED WITH OFFICIAL GOOGLE SDK) ---
+# --- 7. MAIN UI ---
 if st.session_state.current_data:
     d = st.session_state.current_data
     
@@ -207,11 +221,15 @@ if st.session_state.current_data:
         
         with st.spinner(f"Consulting stars in {lang_opt}..."):
             try:
-                # --- NEW STABLE IMPLEMENTATION ---
-                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                # --- FORCED STABLE V1 IMPLEMENTATION ---
+                # Configuring to use REST transport and stable endpoint to avoid 404
+                genai.configure(
+                    api_key=st.secrets["GEMINI_API_KEY"],
+                    transport='rest'
+                )
                 
-                # Using the standard stable model alias
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                # Specifically using the stable version path
+                model = genai.GenerativeModel(model_name="gemini-1.5-flash")
                 
                 response = model.generate_content(prompt)
                 
@@ -225,4 +243,4 @@ if st.session_state.current_data:
 
 else:
     st.title("☸️ TaraVaani")
-    st.info("👈 Please enter birth details in the sidebar to begin.")
+    st.info("👈 Please enter birth details in the sidebar to begin.")info("👈 Please enter birth details in the sidebar to begin.")

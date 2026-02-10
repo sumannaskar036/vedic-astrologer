@@ -47,32 +47,35 @@ try:
 except:
     st.warning("⚠️ Checking API Keys...")
 
-# --- 5. ASTROLOGY ENGINE ---
+# --- 5. ASTROLOGY ENGINE (Topocentric Fix) ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, time_adj_mins=0):
+    # 1. Set Ayanamsa (Lahiri)
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     
-    # Time Correction Logic
+    # 2. FORCE TOPOCENTRIC CALCULATION (Fixes the Cusp Issue)
+    # This accounts for the observer being on the SURFACE of Kolkata, not Earth's center.
+    swe.set_topo(lon, lat, 0) 
+    
+    # 3. Time Processing
     birth_dt = datetime.datetime.combine(dt, tm)
-    # Adjust time by the slider amount (negative moves time back, positive moves forward)
     adjusted_dt = birth_dt + datetime.timedelta(minutes=time_adj_mins)
     
-    # Convert IST to UTC (approx -5:30)
+    # IST to UTC (-5:30)
     utc_dt = adjusted_dt - datetime.timedelta(hours=5, minutes=30)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
+    # 4. Math
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
     asc_deg = (ascmc[0] - ayanamsa) % 360
     
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    
-    # --- THIS WAS THE BROKEN LINE (Fixed now) ---
     lagna_sign = zodiac[int(asc_deg // 30)]
-    lagna_val = asc_deg % 30 
+    lagna_val = asc_deg % 30
     
     planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
     results = []
@@ -117,10 +120,10 @@ with st.sidebar:
 
     st.divider()
     
-    # --- ADVANCED ACCURACY SLIDER ---
+    # --- PRO FEATURE: Advanced Accuracy ---
     with st.expander("🛠️ Advanced Accuracy"):
-        st.caption("Use this if your chart differs from the calculation (e.g., Lagna border).")
-        time_adj = st.slider("Fine-tune Time (Minutes)", -15, 15, 0)
+        st.caption("If your Lagna seems off, adjust this slider slightly.")
+        time_adj = st.slider("Fine-tune Time (Minutes)", -10, 10, 0)
 
     if st.button("🔮 Generate Kundali"):
         with st.spinner("Aligning Stars..."):

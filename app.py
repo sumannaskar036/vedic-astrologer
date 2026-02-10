@@ -9,7 +9,7 @@ from opencage.geocoder import OpenCageGeocode
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS for Green Header & Clean Look
+# Custom CSS
 st.markdown("""
 <style>
     .header-box { 
@@ -111,7 +111,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="L
         "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)
     }
 
-# --- 6. SIDEBAR UI (Matches Screenshot) ---
+# --- 6. SIDEBAR UI (Exact Replica of Screenshot) ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
     
@@ -128,7 +128,14 @@ with st.sidebar:
     n_in = st.text_input("Full Name", "Suman Naskar")
     g_in = st.selectbox("Gender", ["Male", "Female"])
     
-    d_in = st.date_input("Date of Birth", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900, 1, 1), max_value=datetime.date(2025, 12, 31))
+    # --- DATE INPUT FIX ---
+    d_in = st.date_input(
+        "Date of Birth", 
+        value=datetime.date(1993, 4, 23), 
+        min_value=datetime.date(1900, 1, 1), 
+        max_value=datetime.date(2025, 12, 31),
+        format="DD/MM/YYYY"  # <--- Added this to fix format
+    )
     
     c1, c2 = st.columns(2)
     with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=15)

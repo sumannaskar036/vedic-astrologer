@@ -47,27 +47,28 @@ try:
 except:
     st.warning("⚠️ Checking API Keys...")
 
-# --- 5. ASTROLOGY ENGINE (With Rectification) ---
+# --- 5. ASTROLOGY ENGINE (Rectification Removed) ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
-def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, correction_minutes=0):
+def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     
-    # Apply Time Rectification
+    # Standard Time Calculation (No Rectification)
     local_dt = datetime.datetime.combine(dt, tm)
-    adjusted_dt = local_dt + datetime.timedelta(minutes=correction_minutes)
     
-    # Convert to UTC
-    utc_dt = adjusted_dt - datetime.timedelta(hours=5, minutes=30) 
+    # Convert to UTC (Assuming IST -5:30 for now based on your previous code logic)
+    # Note: For global usage, you might eventually need dynamic timezones, 
+    # but I kept your logic intact for now.
+    utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
+    
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
     # Calculate Ayanamsa
     ayanamsa = swe.get_ayanamsa_ut(jd)
     
-    # 1. Calculate Ascendant (Lagna) directly using swe.calc_ut for precision
-    # This ignores house systems and looks purely at the Ecliptic/Horizon intersection
+    # 1. Calculate Ascendant (Lagna)
     res = swe.calc_ut(jd, swe.ASC, 0) # Get Tropical Ascendant first
     asc_tropical = res[0][0]
     
@@ -117,10 +118,7 @@ with st.sidebar:
     city_in = st.text_input("Birth City", value="Kolkata, India", help="Type exact city name")
 
     st.divider()
-    # --- THE RECTIFICATION SLIDER ---
-    st.caption("🔧 Time Rectification")
-    st.info("Old charts often differ by 15-45 mins due to manual errors. Adjust this slider to match your paper chart.")
-    correction = st.slider("Adjust Time (Minutes)", -60, 60, 0, help="Move Left to go back in time (e.g., towards Capricorn)")
+    # (Rectification Section Removed Here)
     
     if st.button("🔮 Generate Kundali"):
         with st.spinner("Aligning Stars..."):
@@ -130,7 +128,8 @@ with st.sidebar:
                 lng = res[0]['geometry']['lng']
                 formatted_city = res[0]['formatted']
                 
-                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city, correction)
+                # Removed the 'correction' argument
+                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
                 try:
                     user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
@@ -152,9 +151,12 @@ with st.sidebar:
     except: profiles = []
 
     if profiles:
-        selected = st.selectbox("Load Profile", [p['Name'] for p in profiles])
+        selected_prof = st.selectbox("Load Profile", [p['Name'] for p in profiles])
         if st.button("Load"):
-            st.session_state.current_data = next(p for p in profiles if p['Name'] == selected)
+            # Fixed logic to find profile
+            found_profile = next((p for p in profiles if p['Name'] == selected_prof), None)
+            if found_profile:
+                st.session_state.current_data = found_profile
 
 # --- 7. UI ---
 st.title("☸️ TaraVaani")

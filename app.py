@@ -5,9 +5,8 @@ import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
-import json
 
-# --- 1. CONFIG ---
+# --- 1. GLOBAL CONFIG ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
 # --- 2. FIREBASE BRIDGE ---
@@ -49,13 +48,13 @@ try:
 except:
     st.warning("⚠️ Checking API Keys...")
 
-# --- 5. ASTROLOGY ENGINE (Native Sidereal) ---
+# --- 5. ASTROLOGY ENGINE (FIXED) ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
-    # 1. Set Global Sidereal Mode (Lahiri is standard)
+    # 1. Set Sidereal Mode
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     
     # 2. Time Conversion
@@ -63,26 +62,32 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # 3. Flags for Calculation
-    # swe.FLG_SIDEREAL (64*1024) + swe.FLG_SWIEPH (2)
-    calc_flag = 64 * 1024 + 2 
+    # 3. Get Ayanamsa (The Vedic Difference)
+    ayanamsa = swe.get_ayanamsa_ut(jd)
     
-    # 4. Calculate Lagna (Ascendant)
-    # We pass the Sidereal Flag HERE to get the correct Vedic House Cusp
-    cusps, ascmc = swe.houses(jd, lat, lon, b'P', calc_flag)
-    asc_deg = ascmc[0] # This is now natively Sidereal
+    # 4. Calculate Lagna (CRASH FIXED HERE)
+    # We removed the 5th argument. We ask for Placidus houses ('P').
+    # Standard swe.houses returns Tropical positions by default.
+    cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
+    asc_tropical = ascmc[0]
+    
+    # 5. FORCE VEDIC SHIFT
+    # We subtract Ayanamsa manually to ensure Capricorn result
+    asc_sidereal = (asc_tropical - ayanamsa) % 360
     
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    lagna_sign = zodiac[int(asc_deg // 30)]
+    lagna_sign = zodiac[int(asc_sidereal // 30)]
     
-    # 5. Calculate Planets
+    # 6. Calculate Planets (Sidereal)
+    SIDEREAL_FLAG = 64 * 1024 
     planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
     results = []
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
     for p, pid in planet_map.items():
-        pos = swe.calc_ut(jd, pid, calc_flag)[0][0]
+        # Planets handle the flag correctly, houses do not
+        pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
         sign = zodiac[int(pos // 30)]
         deg = pos % 30
         nak = nak_list[int(pos / (360/27))]
@@ -126,7 +131,6 @@ with st.sidebar:
                 
                 chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
-                # Silent Save
                 try:
                     user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
                     user_ref.document(n_in).set(chart)

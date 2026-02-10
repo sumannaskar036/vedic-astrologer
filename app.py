@@ -8,13 +8,15 @@ from opencage.geocoder import OpenCageGeocode
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Initialize Session States
+# Initialize Session States for Multi-Profile Memory
 if 'profiles' not in st.session_state:
     st.session_state.profiles = [] 
 if 'current_data' not in st.session_state:
     st.session_state.current_data = None
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
 
-# --- 2. RELIABLE GEOCODER (OpenCage) ---
+# --- 2. RELIABLE ENGINES (OpenCage & Gemini) ---
 def get_coords(city_name):
     """Uses OpenCage API for reliable location searching."""
     try:
@@ -27,8 +29,8 @@ def get_coords(city_name):
         st.error(f"Geocoding Error: {e}")
     return None
 
-# --- SECURITY: Get Paid Tier AI Key ---
 try:
+    # Uses your new PAID Gemini key from Streamlit Secrets
     SERVER_API_KEY = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=SERVER_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
@@ -55,26 +57,24 @@ def get_gana_yoni(nakshatra_name):
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     """Calculates precisely to ensure 1969 Capricorn Lagna Fix."""
-    # 1. INITIALIZE VEDIC ENGINE
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    
-    # 2. CONVERT TIME TO JULIAN DAY
     local_dt = datetime.datetime.combine(dt, tm)
+    # Adjust for IST (UTC+5:30)
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # 3. GET THE AYANAMSA (The fix for sign-jump errors)
+    # THE CRITICAL LAGNA FIX: Manual Ayanamsa shift
     ayanamsa = swe.get_ayanamsa_ut(jd)
-    
-    # 4. CALCULATE SIDEREAL ASCENDANT (Manual Shift)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
+    
+    # Shifting the Ascendant degree by Ayanamsa back from Aquarius to Capricorn
     asc_sidereal = (ascmc[0] - ayanamsa) % 360
     
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", 
               "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
     lagna_sign = zodiac[int(asc_sidereal // 30)]
     
-    # 5. PLANETARY POSITIONS (Force Sidereal Flag)
+    # PLANETARY POSITIONS (Force Sidereal Flag 65536)
     SIDEREAL_FLAG = 64 * 1024
     planet_map = {"Sun": swe.SUN, "Moon": swe.MOON, "Mars": swe.MARS, "Mercury": swe.MERCURY, 
                   "Jupiter": swe.JUPITER, "Venus": swe.VENUS, "Saturn": swe.SATURN, 
@@ -87,66 +87,60 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     for p, pid in planet_map.items():
         pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
         if p == "Ketu": pos = (pos + 180) % 360
-        
         sign = zodiac[int(pos // 30)]
         nak = nak_list[int(pos / (360/27))]
         results.append(f"{p}: {sign} ({pos % 30:.2f}°) | {nak}")
-        
-        if p == "Moon":
-            user_rashi, user_nak = sign, nak
+        if p == "Moon": user_rashi, user_nak = sign, nak
             
     gana, yoni = get_gana_yoni(user_nak)
     return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, 
             "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, 
             "Full_Chart": "\n".join(results)}
 
-# --- 4. SIDEBAR (Profiles & Inputs) ---
+# --- 4. SIDEBAR (Multi-Profile Logic) ---
 with st.sidebar:
     st.header("🗂 Profiles")
     if st.session_state.profiles:
         p_names = [p['Name'] for p in st.session_state.profiles]
-        selected_p = st.selectbox("Saved Profiles", ["Create New..."] + p_names)
-        if selected_p != "Create New...":
+        selected_p = st.selectbox("Switch Active Profile", ["New Profile..."] + p_names)
+        if selected_p != "New Profile...":
             st.session_state.current_data = next(p for p in st.session_state.profiles if p['Name'] == selected_p)
 
     st.divider()
     st.header("👤 Add Birth Details")
-    name_in = st.text_input("Full Name")
+    name_in = st.text_input("Name")
     gender_in = st.selectbox("Gender", ["Male", "Female", "Other"])
-    dob_in = st.date_input("Date of Birth", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900, 1, 1), format="DD/MM/YYYY")
+    dob_in = st.date_input("Date", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900, 1, 1), format="DD/MM/YYYY")
     
     c1, c2 = st.columns(2)
     with c1: hour_in = st.selectbox("Hour", range(24), index=15)
     with c2: min_in = st.selectbox("Minute", range(60), index=45)
-    tob_in = datetime.time(hour_in, min_in)
-    
     city_in = st.text_input("Birth City", "Kolkata, India")
     
     if st.button("✨ Save & Generate", type="primary"):
-        with st.spinner("Calculating Destiny..."):
+        with st.spinner("Connecting to stars..."):
             coords = get_coords(city_in)
             if coords:
-                chart = calculate_vedic_chart(name_in, gender_in, dob_in, tob_in, coords[0], coords[1], city_in)
+                chart = calculate_vedic_chart(name_in, gender_in, dob_in, datetime.time(hour_in, min_in), coords[0], coords[1], city_in)
                 st.session_state.profiles.append(chart)
                 st.session_state.current_data = chart
                 st.rerun()
-            else:
-                st.error("City not found. Try 'City, Country' format.")
 
 # --- 5. MAIN UI ---
 st.title("☸️ TaraVaani")
 if st.session_state.current_data:
     data = st.session_state.current_data
-    st.success(f"Radhe Radhe! {data['Name']}'s chart is active. 🙏")
+    st.success(f"Radhe Radhe! {data['Name']}'s chart is now active. 🙏")
     
-    # Beautiful Data Display
     cols = st.columns(5)
-    fields = ["Lagna", "Rashi", "Nakshatra", "Gana", "Yoni"]
-    for i, field in enumerate(fields):
-        cols[i].metric(field, data[field])
+    cols[0].metric("Lagna", data['Lagna'])
+    cols[1].metric("Rashi", data['Rashi'])
+    cols[2].metric("Nakshatra", data['Nakshatra'])
+    cols[3].metric("Gana", data['Gana'])
+    cols[4].metric("Yoni", data['Yoni'])
     
     st.divider()
     st.subheader("📜 Planetary Positions")
     st.text(data['Full_Chart'])
 else:
-    st.info("👈 Enter birth details in the sidebar and click 'Save & Generate' to begin.")
+    st.info("👈 Enter birth details in the sidebar to create your first profile.")

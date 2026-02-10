@@ -48,33 +48,37 @@ try:
 except:
     st.warning("⚠️ Checking API Keys...")
 
-# --- 5. ASTROLOGY ENGINE (With Override) ---
+# --- 5. ASTROLOGY ENGINE (HIGH PRECISION MODE) ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
-def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, manual_lagna_offset=0):
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
-    swe.set_topo(lon, lat, 0) 
+def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
+    # USE TRUE CHITRAPAKSHA (High Precision Lahiri)
+    swe.set_sid_mode(swe.SIDM_TRUE_CITRA) 
+    
+    # Force Topocentric Calculation (User standing ON Earth, not center)
+    # Important: SwissEph expects (Longitude, Latitude, Altitude)
+    swe.set_topo(lon, lat, 10) # 10 meters altitude (average)
 
     # Time Handling (IST to UTC)
     local_dt = datetime.datetime.combine(dt, tm)
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
+    
+    # Calculate Julian Day (ET - Ephemeris Time for planetary precision)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # Ayanamsa & Ascendant
+    # Calculate Ayanamsa
     ayanamsa = swe.get_ayanamsa_ut(jd)
+    
+    # Calculate Ascendant (Lagna)
+    # houses() returns tropical cusps. We strictly subtract Ayanamsa.
     cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
     asc_tropical = ascmc[0] 
     asc_sidereal = (asc_tropical - ayanamsa) % 360
     
-    # --- MANUAL LAGNA CORRECTION ---
-    # 0 = No Change, -1 = Previous Sign, +1 = Next Sign
-    if manual_lagna_offset != 0:
-        asc_sidereal = (asc_sidereal + (manual_lagna_offset * 30)) % 360
-    
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    lagna_sign = zodiac[int(asc_sidereal // 30) % 12] # Modulo 12 fixes out of bounds
+    lagna_sign = zodiac[int(asc_sidereal // 30)]
     lagna_deg = asc_sidereal % 30
     
     # Planets
@@ -101,6 +105,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, manual_lagna_off
         "Rashi": user_rashi, "Nakshatra": user_nak, 
         "Gana": gana, "Yoni": yoni, "City": city, 
         "Lat": lat, "Lon": lon,
+        "UTC_Time": utc_dt.strftime("%Y-%m-%d %H:%M:%S"),
         "Full_Chart": "\n".join(results)
     }
 
@@ -119,14 +124,6 @@ with st.sidebar:
 
     st.divider()
     
-    # --- MANUAL CORRECTION FEATURE ---
-    st.subheader("🔧 Advanced Correction")
-    lagna_fix = st.radio("Correct Lagna (Ascendant):", ["Auto", "Previous Sign (-1)", "Next Sign (+1)"], horizontal=True)
-    
-    offset_val = 0
-    if lagna_fix == "Previous Sign (-1)": offset_val = -1
-    elif lagna_fix == "Next Sign (+1)": offset_val = 1
-    
     if st.button("🔮 Generate Kundali"):
         with st.spinner("Aligning Stars..."):
             res = geocoder.geocode(city_in)
@@ -135,7 +132,8 @@ with st.sidebar:
                 lng = res[0]['geometry']['lng']
                 formatted_city = res[0]['formatted']
                 
-                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city, offset_val)
+                # No manual override anymore. Just pure math.
+                chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
                 try:
                     user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
@@ -169,7 +167,9 @@ st.title("☸️ TaraVaani")
 if st.session_state.get('current_data'):
     d = st.session_state.current_data
     st.success(f"Janma Kundali: {d['Name']} 🙏")
-    st.caption(f"📍 Location Detected: {d.get('City', 'Unknown')} (Lat: {d.get('Lat', 0):.4f}, Lon: {d.get('Lon', 0):.4f})")
+    
+    # Technical Data for Verification
+    st.caption(f"📍 {d.get('City', 'Unknown')} | ⏱️ UTC: {d.get('UTC_Time', '')}")
     
     cols = st.columns(5)
     cols[0].metric("Lagna", f"{d['Lagna']} ({d.get('Lagna_Deg', '')}°)")
@@ -182,4 +182,4 @@ if st.session_state.get('current_data'):
     st.subheader("📜 Planetary Degrees")
     st.code(d['Full_Chart'], language="text")
 else:
-    st.info("👈 Please enter birth details in the sidebar.")
+    st.info("👈 Please enter birth details in the sidebar.")info("👈 Please enter birth details in the sidebar.")

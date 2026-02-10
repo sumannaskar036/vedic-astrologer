@@ -4,8 +4,7 @@ import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
-import requests
-import json
+import google.generativeai as genai  # IMPORTED OFFICIAL SDK
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
@@ -170,7 +169,7 @@ with st.sidebar:
             found = next((p for p in profiles if p['Name'] == sel_prof), None)
             if found: st.session_state.current_data = found; st.rerun()
 
-# --- 7. MAIN UI (REST API - STRICT FLASH) ---
+# --- 7. MAIN UI (UPDATED WITH OFFICIAL GOOGLE SDK) ---
 if st.session_state.current_data:
     d = st.session_state.current_data
     
@@ -192,7 +191,7 @@ if st.session_state.current_data:
     q_topic = st.selectbox("Choose a Topic:", ["General Life Overview", "Career & Success", "Marriage & Relationships", "Health & Vitality", "Wealth & Finance"])
 
     if st.button("✨ Get Prediction"):
-         prompt = f"""
+        prompt = f"""
         Act as Vedic Astrologer TaraVaani.
         User: {d['Name']} ({d['Gender']}).
         Chart:
@@ -205,46 +204,24 @@ if st.session_state.current_data:
         IMPORTANT: Write response in {lang_opt} language.
         Style: Mystic, positive, clear. Use bullet points.
         """
-         with st.spinner(f"Consulting stars in {lang_opt}..."):
+        
+        with st.spinner(f"Consulting stars in {lang_opt}..."):
             try:
-                api_key = st.secrets["GEMINI_API_KEY"]
-                headers = {"Content-Type": "application/json"}
-                data = {"contents": [{"parts": [{"text": prompt}]}]}
+                # --- NEW STABLE IMPLEMENTATION ---
+                genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                 
-                # --- BRUTE FORCE MODEL SELECTOR ---
-                # We try all known aliases for Flash. 
-                # Does NOT fallback to Pro.
+                # Using the standard stable model alias
+                model = genai.GenerativeModel("gemini-1.5-flash")
                 
-                model_options = [
-                    "gemini-1.5-flash",
-                    "gemini-1.5-flash-latest",
-                    "gemini-1.5-flash-001",
-                    "gemini-1.5-flash-002"
-                ]
+                response = model.generate_content(prompt)
                 
-                success = False
-                last_error = ""
-                
-                for model_name in model_options:
-                    # Try v1beta first
-                    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-                    resp = requests.post(url, headers=headers, data=json.dumps(data))
-                    
-                    if resp.status_code == 200:
-                        try:
-                            ai_text = resp.json()['candidates'][0]['content']['parts'][0]['text']
-                            st.info(ai_text)
-                            success = True
-                            break 
-                        except: pass
-                    else:
-                        last_error = resp.text
-                
-                if not success:
-                    st.error(f"Flash AI Failed. Last Google Error: {last_error}")
+                if response and response.text:
+                    st.info(response.text)
+                else:
+                    st.warning("The stars are silent right now. Please try again.")
                     
             except Exception as e:
-                st.error(f"Connection Error: {e}")
+                st.error(f"Error consulting the stars: {e}")
 
 else:
     st.title("☸️ TaraVaani")

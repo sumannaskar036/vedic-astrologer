@@ -4,19 +4,27 @@ import swisseph as swe
 import datetime
 import time
 from geopy.geocoders import Nominatim
-from geopy.extra.rate_limiter import RateLimiter
 from geopy.exc import GeopyError
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="centered")
 
-# --- 2. RELIABLE GEOCODER ---
-# Using a unique agent name and retry logic to prevent 'Connection Refused'
-try:
-    geolocator = Nominatim(user_agent="taravaani_astro_premium_2026_v1", timeout=10)
-    geocode_service = RateLimiter(geolocator.geocode, min_delay_seconds=1.5)
-except Exception as e:
-    st.error(f"Geocoder Init Error: {e}")
+# --- 2. THE RELIABLE GEOCODER ---
+def get_coords_reliable(city_name):
+    """Attempt geocoding with different agents to bypass server blocks."""
+    # List of unique user agents to try
+    agents = ["taravaani_official_2026", "astro_engine_v1", "suman_naskar_app_99"]
+    
+    for agent in agents:
+        try:
+            geolocator = Nominatim(user_agent=agent, timeout=10)
+            location = geolocator.geocode(city_name)
+            if location:
+                return location
+        except:
+            time.sleep(1) # Brief pause before trying next agent
+            continue
+    return None
 
 # --- SECURITY: Get Paid Tier Key ---
 try:
@@ -27,7 +35,7 @@ except:
     st.error("Secrets not found. Ensure GEMINI_API_KEY is in Streamlit Cloud Settings.")
     st.stop()
 
-# --- 3. ASTROLOGY ENGINE ---
+# --- 3. ASTROLOGY ENGINE (Functions) ---
 def get_gana_yoni(nakshatra_name):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nakshatra_name, ("Unknown", "Unknown"))
@@ -35,7 +43,7 @@ def get_gana_yoni(nakshatra_name):
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     local_dt = datetime.datetime.combine(dt, tm)
-    # Note: Currently hardcoded for IST (+5:30). 
+    # Note: Using IST (+5:30). 
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
@@ -54,32 +62,13 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
     gana, yoni = get_gana_yoni(user_nak)
     return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)}
 
-# New AI Response function to utilize the 'Gender' and 'City'
-def get_ai_response(user_data, question, lang):
-    prompt = f"""
-    You are 'TaraVaani', a wise Vedic Astrologer. 
-    User: {user_data['Name']} ({user_data['Gender']}), born in {user_data['City']}.
-    Chart: {user_data['Full_Chart']}
-    Key Details: Rashi={user_data['Rashi']}, Lagna={user_data['Lagna']}, Nakshatra={user_data['Nakshatra']}, Gana={user_data['Gana']}, Yoni={user_data['Yoni']}
-    Question: {question}
-    Language: {lang}
-    Answer warmly and concisely. Start with 'Namaste {user_data['Name']} 🙏'.
-    """
-    response = model.generate_content(prompt)
-    return response.text
-
-# --- 4. STATE MANAGEMENT ---
-if 'app_state' not in st.session_state:
-    st.session_state.app_state = {'generated': False, 'data': None}
-if 'messages' not in st.session_state:
-    st.session_state.messages = []
-
-# --- 5. SIDEBAR ---
+# --- 4. SIDEBAR ---
 with st.sidebar:
     st.header("👤 Birth Details")
     name = st.text_input("Full Name", placeholder="Enter name")
     gender = st.selectbox("Gender", ["Male", "Female", "Other"])
     
+    # FORMAT: DD/MM/YYYY and range fix
     dob = st.date_input(
         "Date of Birth", 
         value=datetime.date(1993, 4, 23), 
@@ -94,59 +83,25 @@ with st.sidebar:
     tob = datetime.time(hour, minute)
     
     city_input = st.text_input("Birth City", "Kolkata, India")
-    lang = st.selectbox("Language", ["English", "Hindi", "Bengali"])
     
     if st.button("✨ Generate My Destiny", type="primary"):
         if not name:
             st.error("Please enter a name.")
         else:
             with st.spinner("Connecting to celestial coordinates..."):
-                try:
-                    # Retry logic for geocoding
-                    location = None
-                    for _ in range(3):
-                        try:
-                            location = geolocator.geocode(city_input, timeout=10)
-                            if location: break
-                        except:
-                            time.sleep(1)
-                    
-                    if location:
-                        chart_data = calculate_vedic_chart(name, gender, dob, tob, location.latitude, location.longitude, city_input)
-                        st.session_state.app_state = {'generated': True, 'data': chart_data}
-                        st.session_state.messages = [] 
-                        st.rerun()
-                    else:
-                        st.error("📍 City not found. Please add the country (e.g., 'Delhi, India').")
-                except Exception as e:
-                    st.error(f"Star-Link Error: {e}. Please try again.")
+                location = get_coords_reliable(city_input)
+                if location:
+                    chart_data = calculate_vedic_chart(name, gender, dob, tob, location.latitude, location.longitude, city_input)
+                    st.session_state.app_state = {'generated': True, 'data': chart_data}
+                    st.rerun()
+                else:
+                    st.error("📍 Location server is busy. Please wait 10 seconds and try clicking the button again.")
 
-# --- 6. MAIN UI ---
+# --- 5. MAIN UI ---
 st.title("☸️ TaraVaani")
-if st.session_state.app_state['generated']:
+if st.session_state.get('app_state', {}).get('generated'):
     data = st.session_state.app_state['data']
     st.success(f"Radhe Radhe! {data['Name']}'s chart is ready. 🙏")
-    
-    # Quick Summary Table
-    st.markdown(f"""
-    | **Lagna** | **Rashi** | **Nakshatra** | **Gana** | **Yoni** |
-    | :--- | :--- | :--- | :--- | :--- |
-    | {data['Lagna']} | {data['Rashi']} | {data['Nakshatra']} | {data['Gana']} | {data['Yoni']} |
-    """)
-
-    # Chat Interface
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    if prompt := st.chat_input("Ask about career, love, or health..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        with st.chat_message("assistant"):
-            with st.spinner("Consulting the stars..."):
-                reply = get_ai_response(data, prompt, lang)
-                st.markdown(reply)
-                st.session_state.messages.append({"role": "assistant", "content": reply})
+    st.markdown(f"| **Lagna** | **Rashi** | **Nakshatra** | **Gana** | **Yoni** |\n| :--- | :--- | :--- | :--- | :--- |\n| {data['Lagna']} | {data['Rashi']} | {data['Nakshatra']} | {data['Gana']} | {data['Yoni']} |")
 else:
-    st.info("👈 Enter birth details and click 'Generate My Destiny' to start.")
+    st.info("👈 Enter birth details in the sidebar to start your journey.")

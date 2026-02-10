@@ -74,7 +74,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, manual_lagna_off
         asc_sidereal = (asc_sidereal + (manual_lagna_offset * 30)) % 360
     
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    lagna_sign = zodiac[int(asc_sidereal // 30)]
+    lagna_sign = zodiac[int(asc_sidereal // 30) % 12] # Modulo 12 fixes out of bounds
     lagna_deg = asc_sidereal % 30
     
     # Planets
@@ -86,7 +86,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, manual_lagna_off
 
     for p, pid in planet_map.items():
         pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
-        sign = zodiac[int(pos // 30)]
+        sign = zodiac[int(pos // 30) % 12]
         deg = pos % 30
         nak = nak_list[int(pos / (360/27)) % 27]
         results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
@@ -182,4 +182,4 @@ if st.session_state.get('current_data'):
     st.subheader("📜 Planetary Degrees")
     st.code(d['Full_Chart'], language="text")
 else:
-    st.info("👈 Please enter birth details in the sidebar.")info("👈 Please enter birth details in the sidebar.")
+    st.info("👈 Please enter birth details in the sidebar.")

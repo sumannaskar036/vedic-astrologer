@@ -47,20 +47,22 @@ except:
 if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin" 
 if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-# --- 5. ASTROLOGY ENGINE (True Chitrapaksha Fix) ---
+# --- 5. ASTROLOGY ENGINE ---
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
-    # USE TRUE CHITRAPAKSHA (Higher Precision than Standard Lahiri)
-    # This often corrects the "Cusp" errors by using exact star positions
-    swe.set_sid_mode(swe.SIDM_TRUE_CITRA) 
-    
-    # Force Topocentric Calculation (User standing ON Earth)
-    swe.set_topo(lon, lat, 0)
-    
-    # Time Conversion
+    # --- CRITICAL CHANGE: USING TRUE CHITRAPAKSHA ---
+    # This uses exact star positioning instead of the standard Lahiri constant.
+    # It solves many "borderline" Ascendant issues.
+    try:
+        swe.set_sid_mode(swe.SIDM_TRUE_CITRA)
+    except:
+        # Fallback if library version is old, though this is rare on Streamlit Cloud
+        swe.set_sid_mode(27) 
+
+    # Convert to UTC (-5:30 IST)
     birth_dt = datetime.datetime.combine(dt, tm)
     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
@@ -89,7 +91,7 @@ def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
             results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
             if p == "Moon": user_rashi, user_nak = sign, nak
         except:
-            results.append(f"{p}: Error")
+            results.append(f"{p}: Calculation Error")
             
     gana, yoni = get_gana_yoni(user_nak)
     
@@ -107,13 +109,21 @@ with st.sidebar:
     st.header("Create Profile")
     n_in = st.text_input("Full Name")
     g_in = st.selectbox("Gender", ["Male", "Female"])
-    d_in = st.date_input("Date of Birth", value=datetime.date(1969, 3, 16), min_value=datetime.date(1900, 1, 1), format="DD/MM/YYYY")
+    
+    # Date Range 1900-2100
+    d_in = st.date_input(
+        "Date of Birth", 
+        value=datetime.date(1993, 4, 23), 
+        min_value=datetime.date(1900, 1, 1), 
+        max_value=datetime.date(2100, 12, 31),
+        format="DD/MM/YYYY"
+    )
     
     c1, c2 = st.columns(2)
     with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=4)
     with c2: mn_in = st.selectbox("Minute", range(60), index=30)
     
-    city_in = st.text_input("Birth City", value="Kolkata, India", help="Type exact city name")
+    city_in = st.text_input("Birth City", value="Kolkata, India")
 
     st.divider()
     
@@ -125,7 +135,7 @@ with st.sidebar:
                 lng = res[0]['geometry']['lng']
                 formatted_city = res[0]['formatted']
                 
-                # Removed manual adjustment, using pure True Chitrapaksha math
+                # No manual slider anymore. Pure True Chitrapaksha math.
                 chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
                 try:
@@ -136,10 +146,10 @@ with st.sidebar:
                 st.session_state.current_data = chart
                 st.rerun()
             else:
-                st.error("City not found. Try spelling it differently.")
+                st.error("City not found.")
 
     st.divider()
-    st.subheader("📂 Load Profile")
+    st.subheader("📂 Saved Profiles")
     try:
         user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
         profiles = [doc.to_dict() for doc in user_ref.stream()]
@@ -152,7 +162,7 @@ with st.sidebar:
             if found: st.session_state.current_data = found
 
 # --- 7. UI ---
-# Custom CSS for the Green Header
+# Custom CSS
 st.markdown("""
 <style>
 .header-box {
@@ -170,10 +180,8 @@ st.markdown("""
 if st.session_state.get('current_data'):
     d = st.session_state.current_data
     
-    # Custom Header
     st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
     
-    # Top Metrics
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Lagna", f"{d['Lagna']} ({d.get('Lagna_Deg', '')}°)")
     c2.metric("Rashi", d['Rashi'])
@@ -185,4 +193,4 @@ if st.session_state.get('current_data'):
     st.subheader("📜 Planetary Degrees")
     st.code(d['Full_Chart'], language="text")
 else:
-    st.info("👈 Enter details in the sidebar and click Generate.")
+    st.info("👈 Please enter birth details in the sidebar.")

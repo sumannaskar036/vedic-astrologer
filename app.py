@@ -243,4 +243,4 @@ if st.session_state.current_data:
 
 else:
     st.title("☸️ TaraVaani")
-    st.info("👈 Please enter birth details in the sidebar to begin.")info("👈 Please enter birth details in the sidebar to begin.")
+    st.info("👈 Please enter birth details in the sidebar to begin.")

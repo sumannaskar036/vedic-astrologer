@@ -240,10 +240,9 @@ Style: Mystic, positive, clear. Use bullet points.
         )
 
         data = response.json()
-        if "candidates" in data:
-            st.info(data["candidates"][0]["content"]["parts"][0]["text"])
-        else:
-            st.warning("The stars are silent. Check Google Billing or Quotas.")
+        st.subheader("🔍 Gemini Raw Response")
+        st.code(data, language="json")
+
 
 else:
     st.title("☸️ TaraVaani")

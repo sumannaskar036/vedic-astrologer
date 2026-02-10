@@ -3,4 +3,3 @@ google-generativeai
 pyswisseph
 opencage
 firebase-admin
-json

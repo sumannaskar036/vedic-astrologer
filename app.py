@@ -10,7 +10,7 @@ import json
 # --- 1. GLOBAL CONFIG ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# --- 2. FIREBASE BRIDGE (With Auto-Fix) ---
+# --- 2. FIREBASE BRIDGE (Auto-Fix Included) ---
 if not firebase_admin._apps:
     try:
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"]
@@ -46,108 +46,113 @@ if 'current_data' not in st.session_state:
 
 # --- 4. ENGINES ---
 try:
-    # Use OpenCage for "smart search" to simulate a dropdown experience
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-1.5-flash')
 except:
     st.warning("⚠️ Checking API Keys...")
 
-# --- 5. ASTROLOGY ENGINE ---
+# --- 5. ASTROLOGY ENGINE (FIXED FOR VEDIC LAGNA) ---
+
 def get_gana_yoni(nak):
     data = {"Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")}
     return data.get(nak, ("Unknown", "Unknown"))
 
 def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city):
+    # Set Sidereal Mode (Lahiri)
     swe.set_sid_mode(swe.SIDM_LAHIRI)
+    
+    # Convert Time to UTC
     local_dt = datetime.datetime.combine(dt, tm)
     utc_dt = local_dt - datetime.timedelta(hours=5, minutes=30) 
     jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
     
-    # MANUAL AYANAMSA SHIFT (Guarantees Capricorn Lagna for 1969)
+    # --- THE VEDIC LAGNA FIX ---
+    # 1. Get the Ayanamsa (The difference between Western & Vedic)
     ayanamsa = swe.get_ayanamsa_ut(jd)
+    
+    # 2. Calculate Houses (Standard usually returns Tropical)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P')
-    asc_sidereal = (ascmc[0] - ayanamsa) % 360
+    asc_tropical = ascmc[0]
+    
+    # 3. Manually subtract Ayanamsa to force it to Vedic
+    asc_sidereal = (asc_tropical - ayanamsa) % 360
     
     zodiac = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
     lagna_sign = zodiac[int(asc_sidereal // 30)]
     
-    SIDEREAL_FLAG = 64 * 1024
+    # --- PLANETS (Use Sidereal Flag) ---
+    # Note: 64*1024 is the flag for Sidereal calculations in Swiss Ephemeris
+    SIDEREAL_FLAG = 64 * 1024 
+    
     planet_map = {"Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2, "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11}
     results = []
     user_rashi, user_nak = "", ""
     nak_list = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
 
     for p, pid in planet_map.items():
+        # Calculate planet position with Sidereal Flag
         pos = swe.calc_ut(jd, pid, SIDEREAL_FLAG)[0][0]
         sign = zodiac[int(pos // 30)]
+        degree = pos % 30
         nak = nak_list[int(pos / (360/27))]
-        results.append(f"{p}: {sign} | {nak}")
-        if p == "Moon": user_rashi, user_nak = sign, nak
+        
+        results.append(f"{p}: {sign} ({degree:.2f}°) | {nak}")
+        
+        if p == "Moon":
+            user_rashi = sign
+            user_nak = nak
             
     gana, yoni = get_gana_yoni(user_nak)
-    return {"Name": name, "Gender": gender, "Lagna": lagna_sign, "Rashi": user_rashi, "Nakshatra": user_nak, "Gana": gana, "Yoni": yoni, "City": city, "Full_Chart": "\n".join(results)}
+    
+    return {
+        "Name": name, "Gender": gender, 
+        "Lagna": lagna_sign, # Now correctly shifted!
+        "Rashi": user_rashi, "Nakshatra": user_nak, 
+        "Gana": gana, "Yoni": yoni, "City": city, 
+        "Full_Chart": "\n".join(results)
+    }
 
-# --- 6. SIDEBAR: UI DESIGN ---
-# --- 6. SIDEBAR: UI DESIGN ---
+# --- 6. SIDEBAR: UI ---
 with st.sidebar:
     st.header("✨ Create Profile")
-    
-    # 1. Name & Gender
     n_in = st.text_input("Full Name")
     g_in = st.selectbox("Gender", ["Male", "Female"])
+    d_in = st.date_input("Date of Birth", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900, 1, 1), format="DD/MM/YYYY")
     
-    # 2. Date: Start from 1900
-    d_in = st.date_input("Date of Birth", 
-                         value=datetime.date(1993, 4, 23), 
-                         min_value=datetime.date(1900, 1, 1),
-                         format="DD/MM/YYYY")
-    
-    # 3. Time: Side-by-Side
     c1, c2 = st.columns(2)
-    with c1:
-        hr_in = st.selectbox("Hour (24h)", range(24), index=15)
-    with c2:
-        mn_in = st.selectbox("Minute", range(60), index=45)
+    with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=15)
+    with c2: mn_in = st.selectbox("Minute", range(60), index=45)
     
-    # 4. Location: Smart Text Input (Fixes "Diamond Harbour" issue)
-    city_in = st.text_input("Birth City", 
-                            value="Kolkata, India", 
-                            help="Type any city (e.g., Diamond Harbour, Canning, Howrah)")
+    city_in = st.text_input("Birth City", value="Kolkata, India", help="Type any city name")
 
-    # 5. The "Generate Kundali" Button
     if st.button("🔮 Generate Kundali"):
-        with st.spinner("Calculating Planetary Positions..."):
-            # The geocoder will now find ANY city you typed
+        with st.spinner("Aligning Stars..."):
             res = geocoder.geocode(city_in)
-            
             if res:
-                # Get precise coordinates
                 lat = res[0]['geometry']['lat']
                 lng = res[0]['geometry']['lng']
-                formatted_city = res[0]['formatted'] # Use the official name found (e.g., "Diamond Harbour, West Bengal")
+                formatted_city = res[0]['formatted']
                 
                 chart = calculate_vedic_chart(n_in, g_in, d_in, datetime.time(hr_in, mn_in), lat, lng, formatted_city)
                 
-                # Save to Firebase silently
+                # Save to Firebase
                 try:
-                    user_profiles_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
-                    user_profiles_ref.document(n_in).set(chart)
+                    user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+                    user_ref.document(n_in).set(chart)
                 except Exception as e:
-                    st.warning(f"Could not save to history: {e}")
+                    st.warning(f"Cloud Save Issue: {e}")
                 
                 st.session_state.current_data = chart
                 st.rerun()
             else:
-                st.error(f"📍 Could not find '{city_in}'. Please check the spelling.")
+                st.error("City not found. Check spelling.")
 
     st.divider()
-    
-    # Saved Profiles Section
     st.subheader("📂 Saved Profiles")
     try:
-        user_profiles_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
-        docs = user_profiles_ref.stream()
+        user_ref = db.collection("users").document(st.session_state.user_id).collection("profiles")
+        docs = user_ref.stream()
         profiles = [doc.to_dict() for doc in docs]
     except:
         profiles = []
@@ -164,7 +169,6 @@ if st.session_state.get('current_data'):
     d = st.session_state.current_data
     st.success(f"Janma Kundali: {d['Name']} 🙏")
     
-    # Key Metrics Row
     cols = st.columns(5)
     cols[0].metric("Lagna (Ascendant)", d['Lagna'])
     cols[1].metric("Rashi (Moon Sign)", d['Rashi'])

@@ -8,72 +8,72 @@ from opencage.geocoder import OpenCageGeocode
 import time
 
 # --- 1. CONFIGURATION & CSS ---
-st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
+st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide", initial_sidebar_state="collapsed")
 
-# Custom CSS matching your "App Name.png" Drawing
+# Custom CSS matching your Mobile-First "App Name.png" Design
 st.markdown("""
 <style>
-    /* Global Dark Theme */
-    .stApp { background-color: #121212; color: #E0E0E0; }
+    /* Global Mobile-First Settings */
+    .stApp { background-color: #121212; color: #E0E0E0; font-family: sans-serif; }
     
-    /* 1. TOP HEADER (Pinkish/White) */
+    /* 1. TOP HEADER (Pinkish/White) - Fixed Top */
     .top-header {
         display: flex; justify-content: space-between; align-items: center;
-        padding: 15px 15px; background-color: #F8BBD0; color: #880E4F;
-        border-radius: 0 0 15px 15px; font-weight: bold; position: sticky; top: 0; z-index: 999;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        padding: 15px 20px; background-color: #F8BBD0; color: #880E4F;
+        border-radius: 0 0 20px 20px; font-weight: bold; position: sticky; top: 0; z-index: 999;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
     
     /* 2. HERO RIBBON (Red - Horoscope & Matching) */
     .hero-container {
-        display: flex; gap: 15px; margin: 20px 0;
+        display: flex; gap: 15px; margin: 20px 10px;
     }
     .hero-card {
         flex: 1; background: linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%);
         padding: 20px; border-radius: 15px; text-align: center;
-        color: white; box-shadow: 0 4px 10px rgba(211, 47, 47, 0.4);
+        color: white; box-shadow: 0 4px 12px rgba(211, 47, 47, 0.4);
         cursor: pointer; transition: transform 0.1s;
     }
-    .hero-card:active { transform: scale(0.98); }
-    .hero-icon { font-size: 30px; margin-bottom: 8px; }
-    .hero-title { font-size: 16px; font-weight: 600; }
+    .hero-card:active { transform: scale(0.96); }
+    .hero-icon { font-size: 32px; margin-bottom: 5px; }
+    .hero-title { font-size: 14px; font-weight: 600; line-height: 1.2; }
 
     /* 3. PROFILE RIBBON (Purple - Horizontal Scroll) */
-    .profile-section-title { font-size: 14px; color: #B0BEC5; margin: 10px 0 5px 5px; }
+    .profile-section-title { font-size: 13px; color: #B0BEC5; margin: 15px 0 5px 15px; letter-spacing: 0.5px; }
     .profile-scroll-container {
         background: linear-gradient(90deg, #7B1FA2 0%, #4A148C 100%);
-        padding: 15px; border-radius: 15px; overflow-x: auto; white-space: nowrap;
-        scrollbar-width: none; margin-bottom: 20px;
+        padding: 15px; margin: 0 10px 20px 10px; border-radius: 15px; 
+        overflow-x: auto; white-space: nowrap; scrollbar-width: none;
+        box-shadow: inset 0 0 10px rgba(0,0,0,0.3);
     }
-    .profile-pill {
-        display: inline-block; background-color: rgba(255,255,255,0.15); color: white;
-        padding: 10px 20px; border-radius: 12px; margin-right: 15px;
-        text-align: center; min-width: 80px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2);
-    }
-    .profile-pill.active {
-        background-color: #FFD700; color: #3e2723; font-weight: bold; border: 2px solid white;
-    }
-
-    /* 4. TABS & DATA */
+    /* Hide scrollbar for Chrome/Safari/Opera */
+    .profile-scroll-container::-webkit-scrollbar { display: none; }
+    
+    /* 4. TABS & DATA CONTENT */
     .stTabs [data-baseweb="tab-list"] { 
-        background-color: #3E2723; padding: 5px; border-radius: 10px; gap: 5px;
+        background-color: #2D2D2D; padding: 5px; border-radius: 12px; gap: 5px; margin: 0 10px;
     }
     .stTabs [data-baseweb="tab"] {
-        height: 40px; background-color: transparent; color: #D7CCC8; border-radius: 5px; flex: 1;
+        height: 45px; background-color: transparent; color: #B0BEC5; border-radius: 8px; flex: 1; font-size: 13px;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #D32F2F !important; color: white !important; font-weight: bold;
+        background-color: #D32F2F !important; color: white !important; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.4);
     }
     
-    /* 5. BOTTOM NAV (Sticky) */
-    .bottom-nav-spacer { height: 90px; }
-    .bottom-nav {
+    /* 5. BOTTOM NAV (Sticky Footer) */
+    .bottom-nav-spacer { height: 100px; }
+    .bottom-nav-container {
         position: fixed; bottom: 0; left: 0; width: 100%;
         background-color: #1F1F1F; border-top: 1px solid #333;
-        padding: 10px 0; display: flex; justify-content: space-around; z-index: 9999;
+        padding: 12px 0; display: flex; justify-content: space-around; z-index: 9999;
+        box-shadow: 0 -4px 10px rgba(0,0,0,0.5);
     }
 
-    /* Hide Streamlit Default UI */
+    /* Input Fields Styling */
+    div[data-baseweb="input"] { border-radius: 10px; background-color: #2D2D2D; border: 1px solid #444; color: white; }
+    div[data-baseweb="select"] { border-radius: 10px; }
+    
+    /* Hide Streamlit Default UI Elements */
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
 </style>
 """, unsafe_allow_html=True)
@@ -81,7 +81,6 @@ st.markdown("""
 # --- 2. SETUP ---
 if not firebase_admin._apps:
     try:
-        # Handling potential newline issues in keys
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"].replace("\\n", "\n")
         cred = credentials.Certificate({
             "type": st.secrets["FIREBASE_SERVICE_ACCOUNT"]["type"],
@@ -97,7 +96,7 @@ if not firebase_admin._apps:
             "universe_domain": "googleapis.com"
         })
         firebase_admin.initialize_app(cred)
-    except: st.warning("Firebase Config Warning")
+    except: pass # Silent fail for UI testing
 
 db = firestore.client()
 
@@ -119,7 +118,7 @@ def calculate_chart_data(name, gender, dt, tm, city):
     # Setup Moshier for stability
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     
-    # Geocoding (Simulated fallback if API fails)
+    # Geocoding 
     try:
         res = geocoder.geocode(city)
         lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
@@ -162,7 +161,7 @@ def calculate_chart_data(name, gender, dt, tm, city):
         "Full_Chart": chart_text
     }
 
-@st.cache_data(ttl=2) # Short cache for instant updates
+@st.cache_data(ttl=2) 
 def get_profiles(uid):
     try:
         docs = db.collection("users").document(uid).collection("profiles").stream()
@@ -173,37 +172,53 @@ def get_profiles(uid):
 
 # === A. ONBOARDING SCREEN (First Launch) ===
 if not st.session_state.onboarding_complete:
-    st.markdown("<h1 style='text-align: center; color: #F8BBD0;'>☸️ TaraVaani</h1>", unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align: center;'>Begin your Vedic Journey</h3>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("<h1 style='text-align: center; color: #F8BBD0; font-family:serif;'>☸️ TaraVaani</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #AAA;'>Begin your Vedic Journey</p>", unsafe_allow_html=True)
     
-    with st.container():
-        st.markdown('<div style="background-color: #1E1E1E; padding: 20px; border-radius: 15px;">', unsafe_allow_html=True)
-        name = st.text_input("Your Name")
+    c_main = st.container()
+    with c_main:
+        st.markdown('<div style="background-color: #1E1E1E; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin: 10px;">', unsafe_allow_html=True)
+        
+        name = st.text_input("Full Name", placeholder="e.g. Suman Naskar")
         gender = st.selectbox("Gender", ["Male", "Female"])
-        dob = st.date_input("Date of Birth", value=datetime.date(1995, 1, 1))
+        
+        # 1. Date of Birth (Range 1900-2100, DD/MM/YYYY)
+        dob = st.date_input(
+            "Date of Birth", 
+            value=datetime.date(1995, 1, 1),
+            min_value=datetime.date(1900, 1, 1),
+            max_value=datetime.date(2100, 12, 31),
+            format="DD/MM/YYYY"
+        )
+        
+        # 2. Time of Birth (Exact Time Picker)
         t = st.time_input("Time of Birth", value=datetime.time(10, 30))
-        city = st.text_input("Place of Birth", "New Delhi, India")
+        
+        # 3. Location (Smart Input)
+        city = st.text_input("Place of Birth", "Kolkata, India", help="Enter City, Country")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         
         if st.button("✨ Create Profile & Enter", use_container_width=True, type="primary"):
             if name:
-                # Create User ID & Save First Profile
                 uid = f"{name.replace(' ', '_')}_{int(time.time())}"
                 st.session_state.user_id = uid
                 
-                chart = calculate_chart_data(name, gender, dob, t, city)
-                db.collection("users").document(uid).collection("profiles").document(name).set(chart)
-                
-                # Set States
-                st.session_state.active_profile = chart
-                st.session_state.onboarding_complete = True
-                st.rerun()
+                with st.spinner("Aligning Stars..."):
+                    chart = calculate_chart_data(name, gender, dob, t, city)
+                    db.collection("users").document(uid).collection("profiles").document(name).set(chart)
+                    
+                    st.session_state.active_profile = chart
+                    st.session_state.onboarding_complete = True
+                    st.rerun()
             else:
-                st.error("Please enter your name.")
+                st.error("Please enter your name to proceed.")
         st.markdown('</div>', unsafe_allow_html=True)
 
-# === B. MAIN APP ===
+# === B. MAIN APP (Home / Chat / Profile) ===
 else:
-    # Fetch all profiles
+    # Fetch profiles
     profiles = get_profiles(st.session_state.user_id)
     if not st.session_state.active_profile and profiles:
         st.session_state.active_profile = profiles[0]
@@ -211,9 +226,9 @@ else:
     # --- TOP HEADER ---
     st.markdown(f"""
     <div class="top-header">
-        <div style="font-size:20px;">☰</div>
+        <div style="font-size:22px;">☰</div>
         <div style="font-size:18px;">TaraVaani</div>
-        <div style="background:#FFF; color:#880E4F; padding:5px 10px; border-radius:15px; font-size:14px;">
+        <div style="background:#FFF; color:#880E4F; padding:6px 12px; border-radius:20px; font-size:13px; font-weight:800; display:flex; align-items:center; gap:5px;">
             ₹{st.session_state.wallet_balance}
         </div>
     </div>
@@ -229,66 +244,71 @@ else:
         with c1:
             st.markdown("""
             <div class="hero-card">
-                <div class="hero-icon">🔮</div>
+                <div class="hero-icon">🌅</div>
                 <div class="hero-title">Daily<br>Horoscope</div>
             </div>
             """, unsafe_allow_html=True)
-            if st.button("Open Daily", key="daily", use_container_width=True):
+            if st.button("Daily Horoscope", key="daily", use_container_width=True):
                 st.session_state.show_daily = True
         with c2:
             st.markdown("""
             <div class="hero-card">
-                <div class="hero-icon">💍</div>
+                <div class="hero-icon">💞</div>
                 <div class="hero-title">Kundali<br>Matching</div>
             </div>
             """, unsafe_allow_html=True)
-            st.button("Match", key="match", use_container_width=True)
+            st.button("Matching", key="match", use_container_width=True)
 
         # PROFILE RIBBON (Purple) - Only if > 1 profile
         if len(profiles) > 1:
-            st.markdown('<div class="profile-section-title">Select Profile:</div>', unsafe_allow_html=True)
+            st.markdown('<div class="profile-section-title">SELECT PROFILE</div>', unsafe_allow_html=True)
             st.markdown('<div class="profile-scroll-container">', unsafe_allow_html=True)
             
-            # We use columns to simulate the pills inside the container
+            # Using columns for horizontal pills
             cols = st.columns(len(profiles))
             for i, p in enumerate(profiles):
                 is_active = (p['Name'] == st.session_state.active_profile['Name'])
                 style = "primary" if is_active else "secondary"
-                # Using button inside columns for interaction
+                # Using button inside columns
                 if cols[i].button(p['Name'].split()[0], key=f"p_{i}", type=style):
                     st.session_state.active_profile = p
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # DATA TABS (Bottom)
+        # DATA TABS (Bottom Section)
         if st.session_state.active_profile:
             p = st.session_state.active_profile
-            st.markdown(f"### 📜 {p['Name']}'s Details")
             
+            # Tab Styling Fix
+            st.markdown("<br>", unsafe_allow_html=True)
             t1, t2, t3, t4, t5 = st.tabs(["Basic", "Charts", "KP", "Dasha", "Report"])
             
             with t1:
+                st.markdown(f"### 👤 {p['Name']}")
                 c1, c2 = st.columns(2)
                 c1.metric("Lagna", p['Lagna'])
                 c2.metric("Rashi", p['Rashi'])
+                st.divider()
+                c1, c2 = st.columns(2)
                 c1.metric("Nakshatra", p['Nakshatra'])
-                c2.metric("Gender", p['Gender'])
+                c2.caption(f"📍 {p['City']}")
             
             with t2:
-                st.text(p['Full_Chart'])
+                st.text("Planetary Positions:")
+                st.code(p['Full_Chart'])
             
-            with t3: st.info("KP System Module")
-            with t4: st.info("Dasha System Module")
+            with t3: st.info("KP System Module (Under Construction)")
+            with t4: st.info("Dasha System Module (Under Construction)")
             
             with t5: # AI Report
                 st.caption("Ask TaraVaani AI")
-                q = st.selectbox("Topic", ["General", "Career", "Love", "Health"])
-                if st.button("Generate Report"):
-                    prompt = f"Vedic Astrology analysis for {p['Name']}. Lagna: {p['Lagna']}, Rashi: {p['Rashi']}, Planets: {p['Full_Chart']}. Topic: {q}. Keep it short."
+                q = st.selectbox("Choose Topic", ["General Life", "Career & Money", "Love & Relationships", "Health"])
+                if st.button("Generate Prediction", type="primary"):
+                    prompt = f"Vedic Astrology analysis for {p['Name']}. Lagna: {p['Lagna']}, Rashi: {p['Rashi']}, Planets: {p['Full_Chart']}. Topic: {q}. Keep it short and mobile friendly."
                     with st.spinner("Analyzing..."):
                         try:
                             res = model.generate_content(prompt)
-                            st.write(res.text)
+                            st.markdown(res.text)
                         except: st.error("AI Error")
 
         # Daily Horoscope Modal logic
@@ -302,9 +322,8 @@ else:
 
     # 2. CHAT PAGE
     elif st.session_state.page_view == "Chat":
-        st.title("💬 Chat with TaraVaani")
+        st.markdown("### 💬 Chat with TaraVaani")
         
-        # Simple Chat History
         if "chat_history" not in st.session_state: st.session_state.chat_history = []
         
         for msg in st.session_state.chat_history:
@@ -325,7 +344,7 @@ else:
 
     # 3. PROFILE PAGE (Settings)
     elif st.session_state.page_view == "Profile":
-        st.title("👤 Settings")
+        st.markdown("### 👤 Profile Settings")
         
         # Wallet
         st.markdown(f"## Balance: ₹{st.session_state.wallet_balance}")
@@ -341,7 +360,7 @@ else:
         with st.form("new_k"):
             n = st.text_input("Name")
             g = st.selectbox("Gender", ["Male", "Female"])
-            d = st.date_input("Date")
+            d = st.date_input("Date", value=datetime.date(1995,1,1), min_value=datetime.date(1900,1,1), max_value=datetime.date(2100,12,31), format="DD/MM/YYYY")
             t = st.time_input("Time")
             c = st.text_input("City", "Mumbai")
             
@@ -359,17 +378,17 @@ else:
 
     # --- BOTTOM NAVIGATION ---
     st.markdown('<div class="bottom-nav-spacer"></div>', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns(3)
     
-    # Helper for active state
+    # Using columns for Bottom Nav Buttons
+    col1, col2, col3 = st.columns(3)
     def nav_type(page): return "primary" if st.session_state.page_view == page else "secondary"
 
-    if c1.button("🏠 Home", use_container_width=True, type=nav_type("Home")):
+    if col1.button("🏠 Home", use_container_width=True, type=nav_type("Home")):
         st.session_state.page_view = "Home"
         st.rerun()
-    if c2.button("💬 Chat", use_container_width=True, type=nav_type("Chat")):
+    if col2.button("💬 Chat", use_container_width=True, type=nav_type("Chat")):
         st.session_state.page_view = "Chat"
         st.rerun()
-    if c3.button("👤 Profile", use_container_width=True, type=nav_type("Profile")):
+    if col3.button("👤 Profile", use_container_width=True, type=nav_type("Profile")):
         st.session_state.page_view = "Profile"
         st.rerun()

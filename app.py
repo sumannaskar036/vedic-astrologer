@@ -10,79 +10,67 @@ import time
 # --- 1. APP CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="centered", initial_sidebar_state="collapsed")
 
-# --- 2. MOBILE-FIRST CSS (Aggressive Padding Removal) ---
+# --- 2. MOBILE-FIRST CSS (Force Side-by-Side) ---
 st.markdown("""
 <style>
-    /* RESET STREAMLIT PADDING */
-    .stApp { background-color: #121212; color: #E0E0E0; }
+    /* RESET */
+    .stApp { background-color: #121212; color: #E0E0E0; font-family: sans-serif; }
     
-    /* Remove the huge gap at the top of the app */
+    /* Remove Top Padding */
     .block-container {
         padding-top: 0rem !important;
         padding-bottom: 5rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
-        max-width: 100% !important;
     }
     
-    /* TOP HEADER (Fixed Pink Bar) */
+    /* HEADER */
     .top-header {
         position: sticky; top: 0; z-index: 999;
         background-color: #F8BBD0; color: #880E4F;
-        padding: 15px 20px;
-        margin: 0 -0.5rem; /* Stretch to edges */
+        padding: 15px 20px; margin: 0 -0.5rem;
         display: flex; justify-content: space-between; align-items: center;
         border-radius: 0 0 20px 20px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     }
     
-    /* HERO SECTION (Red Background) */
-    .red-section {
-        background-color: #C62828; /* Deep Red */
-        margin: 20px 0; padding: 20px; border-radius: 15px;
-        box-shadow: 0 4px 15px rgba(198, 40, 40, 0.4);
+    /* HERO GRID (FORCE SIDE BY SIDE) */
+    .hero-grid {
+        display: flex; gap: 10px; margin: 20px 0; width: 100%;
     }
-    .hero-btn-container {
-        display: flex; gap: 15px;
+    .hero-col {
+        flex: 1; /* Forces equal width */
+        min-width: 0; /* Prevents overflow */
     }
-    .hero-btn {
-        flex: 1; background: rgba(255,255,255,0.1); 
-        padding: 15px; border-radius: 12px; text-align: center;
-        border: 1px solid rgba(255,255,255,0.3); cursor: pointer;
+    .hero-card {
+        background: linear-gradient(135deg, #D32F2F 0%, #B71C1C 100%);
+        padding: 15px 5px; border-radius: 15px; text-align: center;
+        color: white; height: 100%;
+        display: flex; flex-direction: column; justify-content: center; align-items: center;
+        box-shadow: 0 4px 10px rgba(211, 47, 47, 0.4);
     }
-    .hero-btn:active { background: rgba(255,255,255,0.3); }
+    .hero-icon { font-size: 28px; margin-bottom: 5px; }
+    .hero-text { font-size: 13px; font-weight: bold; line-height: 1.2; }
 
-    /* PROFILE SECTION (Purple Background) */
-    .purple-section {
-        background: linear-gradient(135deg, #7B1FA2 0%, #4A148C 100%);
-        padding: 15px; border-radius: 15px; margin-bottom: 20px;
-        overflow-x: auto; white-space: nowrap;
-        box-shadow: 0 4px 15px rgba(123, 31, 162, 0.4);
+    /* PROFILE SCROLL */
+    .profile-scroll {
+        display: flex; overflow-x: auto; gap: 10px; padding: 10px 5px;
+        scrollbar-width: none; background: #2c0e3a; border-radius: 10px;
     }
-    /* Hide scrollbar */
-    .purple-section::-webkit-scrollbar { display: none; }
+    .profile-scroll::-webkit-scrollbar { display: none; }
     
-    .profile-pill {
-        display: inline-block; background-color: rgba(0,0,0,0.2); 
-        color: white; padding: 10px 20px; border-radius: 20px; margin-right: 10px;
-        border: 1px solid rgba(255,255,255,0.2); text-align: center;
-        min-width: 80px;
-    }
-
-    /* BOTTOM NAV (Fixed Footer) */
-    .bottom-nav {
-        position: fixed; bottom: 0; left: 0; width: 100%;
-        background-color: #212121; border-top: 1px solid #333;
-        padding: 10px 0; display: flex; justify-content: space-around;
-        z-index: 999; padding-bottom: 20px; /* Safe area for modern phones */
-    }
-
     /* INPUTS */
-    div[data-baseweb="input"] { background-color: #2D2D2D !important; border: none; border-radius: 10px; color: white; }
+    div[data-baseweb="input"] { background-color: #2D2D2D !important; border-radius: 10px; border: none; color: white; }
     div[data-baseweb="select"] > div { background-color: #2D2D2D !important; border-radius: 10px; }
+    
+    /* BOTTOM NAV */
+    .bottom-nav-spacer { height: 80px; }
     
     /* Hide Elements */
     #MainMenu, footer, header {visibility: hidden;}
+    
+    /* Button Tweaks */
+    .stButton > button { border-radius: 10px; height: 3em; width: 100%; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -121,7 +109,7 @@ if 'wallet' not in st.session_state: st.session_state.wallet = 0
 
 # --- 5. CALCULATOR ---
 def calculate_chart(name, gender, dt, tm, city):
-    swe.set_sid_mode(swe.SIDM_LAHIRI) # Default
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
     try:
         res = geocoder.geocode(city)
         lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
@@ -144,7 +132,6 @@ def calculate_chart(name, gender, dt, tm, city):
     naks = ["Ashwini", "Bharani", "Krittika", "Rohini", "Mrigashira", "Ardra", "Punarvasu", "Pushya", "Ashlesha", "Magha", "Purva Phalguni", "Uttara Phalguni", "Hasta", "Chitra", "Swati", "Vishakha", "Anuradha", "Jyeshtha", "Mula", "Purva Ashadha", "Uttara Ashadha", "Shravana", "Dhanishta", "Shatabhisha", "Purva Bhadrapada", "Uttara Bhadrapada", "Revati"]
     nakshatra = naks[nak_idx]
 
-    # Full Chart String
     chart_str = ""
     planets = {0:"Sun", 1:"Moon", 4:"Mars", 2:"Mercury", 5:"Jupiter", 3:"Venus", 6:"Saturn", 11:"Rahu"}
     for pid, p_name in planets.items():
@@ -166,7 +153,7 @@ def get_profs(uid):
 
 # --- 6. ONBOARDING ---
 if not st.session_state.onboarding_complete:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("<h1 style='text-align: center; color: #F8BBD0;'>☸️ TaraVaani</h1>", unsafe_allow_html=True)
     
     with st.container():
@@ -174,11 +161,9 @@ if not st.session_state.onboarding_complete:
         name = st.text_input("Full Name")
         gender = st.selectbox("Gender", ["Male", "Female"])
         
-        # Date & Time (Side by Side)
         c1, c2 = st.columns(2)
         dob = c1.date_input("Date", datetime.date(1995,1,1), min_value=datetime.date(1900,1,1), max_value=datetime.date(2100,12,31), format="DD/MM/YYYY")
         
-        # Time Inputs (Hour & Min)
         with c2:
             st.write("Time")
             hc, mc = st.columns(2)
@@ -186,17 +171,13 @@ if not st.session_state.onboarding_complete:
             mn = mc.number_input("Min", 0, 59, 30, label_visibility="collapsed")
         
         city = st.text_input("City", "New Delhi, India")
-        
         st.markdown("<br>", unsafe_allow_html=True)
+        
         if st.button("Start Journey 🚀", type="primary"):
             if name:
                 uid = f"{name}_{int(time.time())}"
                 st.session_state.user_id = uid
-                
-                # Safe Time Object Creation
-                final_time = datetime.time(int(hr), int(mn))
-                
-                chart = calculate_chart(name, gender, dob, final_time, city)
+                chart = calculate_chart(name, gender, dob, datetime.time(hr, mn), city)
                 db.collection("users").document(uid).collection("profiles").document(name).set(chart)
                 st.session_state.active_profile = chart
                 st.session_state.onboarding_complete = True
@@ -222,27 +203,40 @@ else:
     # --- HOME VIEW ---
     if st.session_state.page_view == "Home":
         
-        # A. RED HERO SECTION (Horoscope & Matching)
-        st.markdown('<div class="red-section">', unsafe_allow_html=True)
-        st.markdown('<h4 style="color:white; margin-top:0;">Daily Services</h4>', unsafe_allow_html=True)
+        # A. HERO SECTION (Custom Side-by-Side Grid)
+        # We render HTML for looks, and buttons below for action
+        st.markdown("""
+        <div class="hero-grid">
+            <div class="hero-col">
+                <div class="hero-card">
+                    <div class="hero-icon">🌅</div>
+                    <div class="hero-text">Daily<br>Horoscope</div>
+                </div>
+            </div>
+            <div class="hero-col">
+                <div class="hero-card">
+                    <div class="hero-icon">💞</div>
+                    <div class="hero-text">Kundali<br>Matching</div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown('<div class="hero-btn">🌅<br><b>Horoscope</b></div>', unsafe_allow_html=True)
-            if st.button("Read", key="d_h"): st.session_state.show_daily = True
-        with c2:
-            st.markdown('<div class="hero-btn">💞<br><b>Matching</b></div>', unsafe_allow_html=True)
-            st.button("Match", key="k_m")
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Invisible Buttons to capture clicks on the grid areas
+        b1, b2 = st.columns(2)
+        if b1.button("Read Horoscope"): st.session_state.show_daily = True
+        if b2.button("Check Matching"): pass
 
-        # B. PURPLE PROFILE LIST (Only if > 1 profile)
+        # B. PROFILE SCROLL (Only if > 1 profile)
         if len(profs) > 1:
-            st.markdown('<div class="purple-section">', unsafe_allow_html=True)
-            cols = st.columns(len(profs))
+            st.markdown('<p style="color:#888; font-size:12px; margin: 15px 0 5px 5px;">SWITCH PROFILE</p>', unsafe_allow_html=True)
+            st.markdown('<div class="profile-scroll">', unsafe_allow_html=True)
+            # Use standard Streamlit columns to hold buttons
+            p_cols = st.columns(len(profs))
             for i, p in enumerate(profs):
                 is_act = (p['Name'] == st.session_state.active_profile['Name'])
                 sty = "primary" if is_act else "secondary"
-                if cols[i].button(p['Name'].split()[0], key=f"prof_{i}", type=sty):
+                if p_cols[i].button(p['Name'].split()[0], key=f"prof_{i}", type=sty):
                     st.session_state.active_profile = p
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
@@ -250,7 +244,7 @@ else:
         # C. DATA TABS
         if st.session_state.active_profile:
             p = st.session_state.active_profile
-            st.subheader(f"📜 {p['Name']}")
+            st.markdown(f"<h3 style='margin-top:10px;'>{p['Name']}</h3>", unsafe_allow_html=True)
             
             t1, t2, t3, t4, t5 = st.tabs(["Basic", "Charts", "KP", "Dasha", "Report"])
             
@@ -269,16 +263,15 @@ else:
                 q = st.selectbox("Topic", ["Life", "Career", "Love"])
                 if st.button("Ask AI"):
                     with st.spinner("..."):
-                        res = model.generate_content(f"Analyze: {p['Full_Chart']} for {q}")
-                        st.write(res.text)
+                        try:
+                            res = model.generate_content(f"Analyze: {p['Full_Chart']} for {q}")
+                            st.write(res.text)
+                        except: st.error("AI Busy")
 
-        # Daily Modal
         if st.session_state.get('show_daily'):
             with st.expander("Today's Forecast", expanded=True):
-                st.info("A great day for spiritual growth.")
-                if st.button("Close"): 
-                    st.session_state.show_daily = False
-                    st.rerun()
+                st.info("Good fortune awaits!")
+                if st.button("Close"): st.session_state.show_daily = False; st.rerun()
 
     # --- CHAT VIEW ---
     elif st.session_state.page_view == "Chat":
@@ -293,9 +286,11 @@ else:
             with st.chat_message("assistant"):
                 p = st.session_state.active_profile
                 final_q = f"Context: {p['Name']}, {p['Lagna']} Lagna. Q: {user_in}"
-                ans = model.generate_content(final_q).text
-                st.write(ans)
-                st.session_state.msgs.append({"role":"assistant", "content":ans})
+                try:
+                    ans = model.generate_content(final_q).text
+                    st.write(ans)
+                    st.session_state.msgs.append({"role":"assistant", "content":ans})
+                except: st.error("AI Error")
 
     # --- PROFILE VIEW ---
     elif st.session_state.page_view == "Profile":
@@ -317,7 +312,7 @@ else:
                     st.success("Added!"); time.sleep(1); st.rerun()
 
     # --- BOTTOM NAV ---
-    st.markdown('<div style="height:80px"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="bottom-nav-spacer"></div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     def act(page): return "primary" if st.session_state.page_view == page else "secondary"
     

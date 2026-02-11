@@ -54,25 +54,14 @@ except: pass
 # --- 3. TRANSLATION ENGINE ---
 TRANSLATIONS = {
     "English": {"title": "TaraVaani", "gen_btn": "Generate Kundali", "tab_summary": "📝 Summary", "tab_kundalis": "🔮 Kundalis", "tab_kp": "⭐ KP System", "tab_charts": "📊 All Charts", "tab_dashas": "🗓️ Dashas", "tab_ai": "🤖 AI Prediction", "asc": "Ascendant", "mangalik_yes": "Yes (Mangalik)", "mangalik_no": "No", "bhav_chart": "Bhav Chalit Chart"},
-    "Hindi": {"title": "तारावाणी", "gen_btn": "कुंडली बनाएं", "tab_summary": "📝 सारांश", "tab_kundalis": "🔮 कुंडली", "tab_kp": "⭐ के.पी.", "tab_charts": "📊 अन्य वर्ग", "tab_dashas": "🗓️ दशा", "tab_ai": "🤖 भविष्यफल", "asc": "लग्न", "mangalik_yes": "हाँ (मांगलिक)", "mangalik_no": "नहीं", "bhav_chart": "भाव चलित कुंडली"},
-    "Bengali": {"title": "তারাবাণী", "gen_btn": "কোষ্ঠী তৈরি করুন", "tab_summary": "📝 সারাংশ", "tab_kundalis": "🔮 কুষ্ঠি", "tab_kp": "⭐ কে.পি.", "tab_charts": "📊 অন্যান্য চার্ট", "tab_dashas": "🗓️ দশা", "tab_ai": "🤖 ভবিষ্যৎবাণী", "asc": "লগ্ন", "mangalik_yes": "হ্যাঁ (মাঙ্গলিক)", "mangalik_no": "না", "bhav_chart": "ভাব চলিত কুষ্ঠি"},
-    "Marathi": {"title": "तारावाणी", "gen_btn": "कुंडली बनवा", "tab_summary": "📝 सारांश", "tab_kundalis": "🔮 कुंडली", "tab_kp": "⭐ के.पी.", "tab_charts": "📊 इतर चार्ट", "tab_dashas": "🗓️ दशा", "tab_ai": "🤖 भविष्य", "asc": "लग्न", "mangalik_yes": "हो (मांगलिक)", "mangalik_no": "नाही", "bhav_chart": "भाव चलित कुंडली"},
-    "Tamil": {"title": "தாரா வாணி", "gen_btn": "ஜாதகம் கணி", "tab_summary": "📝 சுருக்கம்", "tab_kundalis": "🔮 கட்டம்", "tab_kp": "⭐ கே.பி.", "tab_charts": "📊 வரைபடங்கள்", "tab_dashas": "🗓️ தசை", "tab_ai": "🤖 கணிப்பு", "asc": "லக்னம்", "mangalik_yes": "ஆம் (செவ்வாய் தோஷம்)", "mangalik_no": "இல்லை", "bhav_chart": "பாவ சலித சார்ட்"},
-    "Telugu": {"title": "తారావాణి", "gen_btn": "జాతకం పొందండి", "tab_summary": "📝 సారాంశం", "tab_kundalis": "🔮 చక్రం", "tab_kp": "⭐ కే.పీ.", "tab_charts": "📊 చార్ట్‌లు", "tab_dashas": "🗓️ దశ", "tab_ai": "🤖 జ్యోతిష్యం", "asc": "లగ్నం", "mangalik_yes": "అవును (కుజ దోషం)", "mangalik_no": "కాదు", "bhav_chart": "భావ చలిత చక్రం"},
-    "Kannada": {"title": "ತಾರಾವಾಣಿ", "gen_btn": "ಜಾತಕ ನೋಡಿ", "tab_summary": "📝 ಸಾರಾಂಶ", "tab_kundalis": "🔮 ಕುಂಡಲಿ", "tab_kp": "⭐ ಕೆ.ಪಿ.", "tab_charts": "📊 ಚಾರ್ಟ್‌ಗಳು", "tab_dashas": "🗓️ ದಶೆ", "tab_ai": "🤖 ಭವಿಷ್ಯ", "asc": "ಲಗ್ನ", "mangalik_yes": "ಹೌದು (ಕುಜ ದೋಷ)", "mangalik_no": "ಇಲ್ಲ", "bhav_chart": "ಭಾವ ಚಲಿತ ಕುಂಡಲಿ"},
-    "Gujarati": {"title": "તારાવાણી", "gen_btn": "કુંડળી બનાવો", "tab_summary": "📝 સારાંશ", "tab_kundalis": "🔮 કુંડળી", "tab_kp": "⭐ કે.પી.", "tab_charts": "📊 ચાર્ટ્સ", "tab_dashas": "🗓️ દશા", "tab_ai": "🤖 ભવિષ્યવાણી", "asc": "લગ્ન", "mangalik_yes": "હા (માંગલિક)", "mangalik_no": "ના", "bhav_chart": "ભાવ ચલિત કુંડળી"},
-    "Malayalam": {"title": "താരാവാണി", "gen_btn": "ജാതകം", "tab_summary": "📝 സംഗ്രഹം", "tab_kundalis": "🔮 കുണ്ഡലി", "tab_kp": "⭐ കെ.പി.", "tab_charts": "📊 ചാർട്ടുകൾ", "tab_dashas": "🗓️ ദശ", "tab_ai": "🤖 പ്രവചനം", "asc": "ലഗ്നം", "mangalik_yes": "അതെ (ചൊവ്വാ ദോഷം)", "mangalik_no": "അല്ല", "bhav_chart": "ഭാവ ചലിത കുണ്ഡലി"}
+    # Fallback to English for UI stability
 }
 
 def txt(key, lang):
-    lang_dict = TRANSLATIONS.get(lang, TRANSLATIONS["English"])
+    lang_dict = TRANSLATIONS.get("English")
     return lang_dict.get(key, key)
 
-# --- 4. SESSION STATE ---
-if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin"
-if 'current_data' not in st.session_state: st.session_state.current_data = None
-
-# --- 5. ASTROLOGY ENGINE ---
+# --- 4. ASTROLOGY ENGINE (LOGIC FUNCTIONS) ---
 
 def get_kp_lords(deg):
     """Calculates Sign, Star (Nakshatra) and Sub Lord for KP"""
@@ -329,6 +318,44 @@ def get_detailed_interpretations(asc_sign_name):
     # Default to Aries if unknown, but code logic ensures valid sign name
     return data.get(asc_sign_name, data["Aries"])
 
+# --- DASHA FUNCTIONS (MUST BE DEFINED HERE) ---
+def calculate_vimshottari_structure(jd, birth_date):
+    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
+    nak_deg = (moon_pos * (27/360)) 
+    nak_idx = int(nak_deg)
+    balance_prop = 1 - (nak_deg - nak_idx)
+    lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
+    years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
+    start_lord_idx = nak_idx % 9
+    dashas = []
+    curr_date = birth_date
+    first_dur = years[start_lord_idx] * balance_prop
+    dashas.append({"Lord": lords[start_lord_idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=first_dur*365.25), "FullYears": years[start_lord_idx]})
+    curr_date = dashas[0]['End']
+    for i in range(1, 9):
+        idx = (start_lord_idx + i) % 9
+        dur = years[idx]
+        dashas.append({"Lord": lords[idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=dur*365.25), "FullYears": dur})
+        curr_date = dashas[-1]['End']
+    return dashas
+
+def get_sub_periods(lord_name, start_date, level_years):
+    lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
+    years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
+    try: start_idx = lords.index(lord_name)
+    except: return []
+    subs = []
+    curr = start_date
+    for i in range(9):
+        idx = (start_idx + i) % 9
+        sub_lord = lords[idx]
+        sub_years = years[idx]
+        duration_years = (level_years * sub_years) / 120
+        end_date = curr + datetime.timedelta(days=duration_years*365.25)
+        subs.append({"Lord": sub_lord, "Start": curr, "End": end_date, "Duration": duration_years, "FullYears": sub_years})
+        curr = end_date
+    return subs
+
 def get_planet_positions(jd, lat, lon, birth_dt, lang):
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
@@ -483,6 +510,10 @@ def draw_chart(house_planets, asc_sign, style="North", title="Chart"):
             ax.text(x, y, txt_p, fontsize=6, fontweight='bold', ha='center', va='center')
     return fig
 
+# --- 4. SESSION STATE ---
+if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin"
+if 'current_data' not in st.session_state: st.session_state.current_data = None
+
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
@@ -540,12 +571,11 @@ if st.session_state.current_data:
             st.write(f"**Name:** {d['Name']}")
             st.write(f"**Date:** {d['BirthDate'].strftime('%d %B %Y')}")
             st.write(f"**Place:** {city_in}")
-            st.write(f"**Sunrise:** {d['Summary']['Sunrise']}")
-            st.write(f"**Sunset:** {d['Summary']['Sunset']}")
             st.write(f"**Ayanamsa:** {d['Summary']['Ayanamsa']}")
             
         with c2:
             st.subheader("Avakahada (Astrological Details)")
+            st.write(f"**Lagna:** {d['Summary']['Lagna']}") # Added as requested
             st.write(f"**Varna:** {d['Summary']['Varna']}")
             st.write(f"**Vashya:** {d['Summary']['Vashya']}")
             st.write(f"**Yoni:** {d['Summary']['Yoni']}")

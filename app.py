@@ -17,7 +17,6 @@ st.markdown("""
     .header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; text-align: center; font-weight: bold; margin-bottom: 20px;}
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
     .stSelectbox label { font-weight: bold; }
-    h3 { font-size: 1.2rem; font-weight: 600; margin-top: 1rem; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -52,7 +51,6 @@ except: pass
 # --- 3. TRANSLATION ENGINE ---
 TRANSLATIONS = {
     "English": {"title": "TaraVaani", "gen_btn": "Generate Kundali", "tab_summary": "📝 Summary", "tab_kundalis": "🔮 Kundalis", "tab_kp": "⭐ KP System", "tab_charts": "📊 All Charts", "tab_dashas": "🗓️ Dashas", "tab_ai": "🤖 AI Prediction", "asc": "Ascendant", "mangalik_yes": "Yes (Mangalik)", "mangalik_no": "No"},
-    # Only English for UI stability, full 9 langs supported in AI Chat
 }
 
 def txt(key, lang):
@@ -111,8 +109,27 @@ def calculate_varga_sign(deg, varga_num):
         start = sign_idx if (sign_idx % 2 == 0) else (sign_idx + 8)
         return ((start + int(deg_in_sign/3)) % 12) + 1
     elif varga_num == 12: return ((sign_idx + int(deg_in_sign/2.5)) % 12) + 1
-    # Harmonic fallback for higher vargas to ensure stability
     return (int(deg * varga_num / 30) % 12) + 1
+
+def get_planet_status(planet, sign_name):
+    # D1 Status Logic
+    sign_map = {"Aries":1, "Taurus":2, "Gemini":3, "Cancer":4, "Leo":5, "Virgo":6, "Libra":7, "Scorpio":8, "Sagittarius":9, "Capricorn":10, "Aquarius":11, "Pisces":12}
+    s_id = sign_map.get(sign_name, 0)
+    
+    if planet in ["Ascendant", "Rahu", "Ketu"]: return "--" # Simplified for nodes in this view
+    
+    own = {"Sun":[5], "Moon":[4], "Mars":[1,8], "Mercury":[3,6], "Jupiter":[9,12], "Venus":[2,7], "Saturn":[10,11]}
+    exalted = {"Sun":1, "Moon":2, "Mars":10, "Mercury":6, "Jupiter":4, "Venus":12, "Saturn":7}
+    debilitated = {"Sun":7, "Moon":8, "Mars":4, "Mercury":12, "Jupiter":10, "Venus":6, "Saturn":1}
+    friends = {"Sun":[4,1,8,9,12], "Moon":[5,3,6], "Mars":[5,4,9,12], "Mercury":[5,2,7], "Jupiter":[5,4,1,8], "Venus":[3,6,10,11], "Saturn":[3,6,2,7]}
+    enemies = {"Sun":[2,7,10,11], "Moon":[], "Mars":[3,6], "Mercury":[4], "Jupiter":[3,6,2,7], "Venus":[5,4], "Saturn":[5,4,1,8]}
+    
+    if s_id in own.get(planet, []): return "Own Sign"
+    if exalted.get(planet) == s_id: return "Exalted"
+    if debilitated.get(planet) == s_id: return "Debilitated"
+    if s_id in friends.get(planet, []): return "Friendly"
+    if s_id in enemies.get(planet, []): return "Enemy"
+    return "Neutral"
 
 def calculate_panchang(jd, lat, lon, birth_dt, moon_pos):
     try:
@@ -145,7 +162,6 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
     raw_bodies = {}
     raw_bodies["Ascendant"] = asc_deg
     
-    # 1. RAW POSITIONS
     for pid, name in planet_map.items():
         if name == "Ketu":
             rahu_pos = swe.calc_ut(jd, 11, swe.FLG_SIDEREAL)[0][0]
@@ -154,7 +170,7 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
             pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)[0][0]
         raw_bodies[name] = pos
 
-    # 2. CHARTS (19 VARGAS + SPECIALS)
+    # --- VARGA CALCULATION ---
     varga_list = [1, 2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60]
     charts_data = {}
     
@@ -168,7 +184,7 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
             house_num = ((p_varga_sign - asc_varga_sign) % 12) + 1
             charts_data[chart_key][house_num].append(p_name)
             
-    charts_data["Chalit"] = charts_data["D1"] # Visual D1
+    charts_data["Chalit"] = charts_data["D1"] 
     
     # Sun & Moon Charts
     sun_sign = int(raw_bodies["Sun"] / 30) + 1
@@ -185,29 +201,32 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
     charts_data["Sun"] = sun_data
     charts_data["Moon"] = moon_data
 
-    # 3. PLANET DETAILS (D1)
+    # --- PLANET DETAILS (D1) + STATUS RESTORED ---
     planet_details = []
     nak_list = ["Ashwini","Bharani","Krittika","Rohini","Mrigashira","Ardra","Punarvasu","Pushya","Ashlesha","Magha","Purva Phalguni","Uttara Phalguni","Hasta","Chitra","Swati","Vishakha","Anuradha","Jyeshtha","Mula","Purva Ashadha","Uttara Ashadha","Shravana","Dhanishta","Shatabhisha","Purva Bhadrapada","Uttara Bhadrapada","Revati"]
     zodiac_list = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"]
     
-    # 4. KP DATA
-    kp_planets = []
-    kp_cusps = []
-    
-    # KP Planets
     for p_name, p_deg in raw_bodies.items():
         sign_name = zodiac_list[int(p_deg / 30) % 12]
         nak_name = nak_list[int(p_deg / (360/27)) % 27]
         house_d1 = ((int(p_deg/30) - int(raw_bodies["Ascendant"]/30)) % 12) + 1
         
-        # Regular Details
-        planet_details.append({"Planet": p_name, "Sign": sign_name, "Nakshatra": nak_name, "Degree": f"{int(p_deg%30)}°{int((p_deg%30%1)*60)}'", "House": house_d1})
+        # RESTORED: Status Calculation
+        status = get_planet_status(p_name, sign_name)
         
-        # KP Details
+        planet_details.append({
+            "Planet": p_name, "Sign": sign_name, "Nakshatra": nak_name,
+            "Degree": f"{int(p_deg%30)}°{int((p_deg%30%1)*60)}'", 
+            "House": house_d1, "Status": status
+        })
+
+    # KP Data
+    kp_planets = []
+    kp_cusps = []
+    for p_name, p_deg in raw_bodies.items():
         k_s, k_st, k_sb = get_kp_lords(p_deg)
         kp_planets.append({"Planet": p_name, "Sign Lord": k_s, "Star Lord": k_st, "Sub Lord": k_sb})
 
-    # KP Cusps
     for i in range(1, len(cusps)):
         if i > 12: break
         c_deg = cusps[i]
@@ -218,14 +237,12 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
     day_lords = ["Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Sun"]
     ruling_planets = [
         {"Type": "Ascendant", "Sign Lord": kp_planets[0]['Sign Lord'], "Star Lord": kp_planets[0]['Star Lord'], "Sub Lord": kp_planets[0]['Sub Lord']},
-        {"Type": "Moon", "Sign Lord": kp_planets[2]['Sign Lord'], "Star Lord": kp_planets[2]['Star Lord'], "Sub Lord": kp_planets[2]['Sub Lord']}, # Index 2 is Moon in sorted list usually, better lookup needed
+        {"Type": "Moon", "Sign Lord": kp_planets[2]['Sign Lord'], "Star Lord": kp_planets[2]['Star Lord'], "Sub Lord": kp_planets[2]['Sub Lord']},
         {"Type": "Day Lord", "Sign Lord": day_lords[birth_dt.weekday()], "Star Lord": "-", "Sub Lord": "-"}
     ]
 
-    # Summary
     moon_pos = raw_bodies["Moon"]
-    mars_h = planet_details[2]['House'] # Rough check, assuming Mars index
-    is_mangalik = "Yes" if mars_h in [1,4,7,8,12] else "No"
+    is_mangalik = "Yes" if planet_details[2]['House'] in [1,4,7,8,12] else "No" # Mars is index 2
     
     summary = {
         "Lagna": zodiac_list[int(raw_bodies["Ascendant"]/30) % 12],
@@ -318,7 +335,6 @@ def get_sub_periods(lord_name, start_date, level_years):
 with st.sidebar:
     st.title("☸️ TaraVaani")
     lang_opt = st.selectbox("Language (AI Only)", ["English", "Hindi", "Bengali", "Marathi", "Tamil", "Telugu", "Kannada", "Gujarati", "Malayalam"])
-    
     st.header("Create Profile")
     n_in = st.text_input("Name", "Suman Naskar")
     g_in = st.selectbox("Gender", ["Male", "Female"])
@@ -329,7 +345,7 @@ with st.sidebar:
     city_in = st.text_input("City", "Kolkata, India")
     
     if st.button("Generate Kundali", type="primary"):
-        with st.spinner("Calculating 19 Charts..."):
+        with st.spinner("Calculating..."):
             try:
                 res = geocoder.geocode(city_in)
                 if res:
@@ -355,7 +371,8 @@ with st.sidebar:
 if st.session_state.current_data:
     d = st.session_state.current_data
     
-    if 'KP_Planets' not in d:
+    # Safety Check: If data structure old, force reload
+    if 'Charts' not in d or 'Status' not in d['Planet_Details'][0]: 
         st.warning("⚠️ Upgrade Applied. Click 'Generate Kundali' again.")
         st.stop()
     
@@ -371,15 +388,30 @@ if st.session_state.current_data:
         st.subheader("Planetary Positions")
         st.dataframe(pd.DataFrame(d['Planet_Details']), use_container_width=True)
 
-    # 2. KUNDALIS (D1 & D9)
+    # 2. KUNDALIS
     with tab2:
         c_type = st.selectbox("Style:", ["North Indian", "South Indian"])
         style = "North" if "North" in c_type else "South"
         c1, c2 = st.columns(2)
         d1_asc_sign = int(d['Raw_Bodies']['Ascendant'] / 30) + 1
         d9_asc_sign = calculate_varga_sign(d['Raw_Bodies']['Ascendant'], 9)
-        with c1: st.pyplot(draw_chart(d['Charts']['D1'], d1_asc_sign, style, "Lagna (D1)"))
-        with c2: st.pyplot(draw_chart(d['Charts']['D9'], d9_asc_sign, style, "Navamsa (D9)"))
+        with c1: st.pyplot(draw_chart(d['Charts']['D1'], d1_asc_sign, style, "Lagna Chart (D1)"))
+        with c2: st.pyplot(draw_chart(d['Charts']['D9'], d9_asc_sign, style, "Navamsa Chart (D9)"))
+        
+        st.divider()
+        st.subheader("Planetary Details & Status")
+        st.dataframe(pd.DataFrame(d['Planet_Details']), use_container_width=True)
+        
+        # RESTORED: Status Guide
+        st.divider()
+        with st.expander("📌 Planetary Status Guide (What does it mean?)", expanded=True):
+            st.markdown("""
+            * **Exalted (Ucha):** Planet is at peak power. Excellent results.
+            * **Debilitated (Neecha):** Planet is weak. Results may be challenging.
+            * **Own Sign (Swakshetra):** Planet is at home. Strong and comfortable.
+            * **Friendly (Mitra):** Planet is in a friend's house. Good cooperation.
+            * **Enemy (Shatru):** Planet is in an enemy's house. Uncomfortable/Agitated.
+            """)
 
     # 3. KP SYSTEM
     with tab3:
@@ -449,6 +481,9 @@ if st.session_state.current_data:
         pd_list = get_sub_periods(sel_ad['Lord'], sel_ad['Start'], sel_ad['Duration'])
         pd_data = [{"Lord": p['Lord'], "Start": p['Start'].strftime('%d-%b-%Y'), "End": p['End'].strftime('%d-%b-%Y')} for p in pd_list]
         st.dataframe(pd.DataFrame(pd_data), use_container_width=True)
+        
+        # --- LEVEL 4: SOOKSHMA ---
+        st.divider()
         
         pd_opts = [f"{p['Lord']} (ends {p['End'].strftime('%d-%b-%Y')})" for p in pd_list]
         sel_pd_idx = st.selectbox("⬇️ Select Pratyantar:", range(len(pd_list)), format_func=lambda x: pd_opts[x])

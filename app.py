@@ -4,13 +4,11 @@ import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
-import requests
-import google.generativeai as genai  # ✅ ADDED GEMINI IMPORT
+import google.generativeai as genai
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
-# Custom CSS for UI
 st.markdown("""
 <style>
     .header-box { 
@@ -57,7 +55,7 @@ try:
 except Exception:
     geocoder = None
 
-# ✅ CONFIGURE GEMINI HERE
+# ✅ GEMINI CONFIGURATION
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except Exception as e:
@@ -223,6 +221,7 @@ if st.session_state.current_data:
     )
 
     if st.button("✨ Get Prediction"):
+        # ✅ UPDATED PROMPT WITH 'RADHE RADHE'
         prompt = f"""
 Act as Vedic Astrologer TaraVaani.
 User: {d['Name']} ({d['Gender']}).
@@ -233,22 +232,21 @@ Chart:
 - Planets: {d['Full_Chart']}
 
 Question: Predict about {q_topic}.
-IMPORTANT: Write response in {lang_opt} language.
+IMPORTANT:
+1. Start response with "Radhe Radhe 🙏".
+2. Write response in {lang_opt} language.
 Style: Mystic, positive, clear. Use bullet points.
 """
         
-        # ✅ GEMINI 1.5 FLASH BLOCK (Replaces OpenAI)
+        # ✅ GEMINI 1.5 FLASH LOGIC
         try:
-            # We use the standard model name. 
-            # If 404 occurs, update requirements.txt to google-generativeai>=0.7.0
             model = genai.GenerativeModel('gemini-1.5-flash')
             response = model.generate_content(prompt)
             st.info(response.text)
-            
         except Exception as e:
             st.error(f"AI Error: {e}")
             if "404" in str(e):
-                st.warning("Hint: If you see a 404 error, ensure your requirements.txt has 'google-generativeai>=0.7.0'")
+                st.warning("⚠️ Billing Verification Pending: Google is verifying your ID. The API will unlock automatically in 24-48 hours.")
 
 else:
     st.title("☸️ TaraVaani")

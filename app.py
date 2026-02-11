@@ -480,40 +480,111 @@ def get_sub_periods(lord_name, start_date, level_years):
     return subs
 
 # --- 5. SIDEBAR ---
+import random
+
 with st.sidebar:
     st.title("☸️ TaraVaani")
-    lang_opt = st.selectbox("Language (AI Only)", ["English", "Hindi", "Bengali", "Marathi", "Tamil", "Telugu", "Kannada", "Gujarati", "Malayalam"])
+
+    # Language Selection
+    lang_opt = st.selectbox(
+        "Language (AI Only)",
+        ["English", "Hindi", "Bengali", "Kannada", "Gujarati", "Telugu", "Tamil", "Malayalam", "Marathi"]
+    )
+
     st.header("Create Profile")
-    n_in = st.text_input("Name", "Suman Naskar")
-    g_in = st.selectbox("Gender", ["Male", "Female"])
-    d_in = st.date_input("Date of Birth", value=datetime.date(1993, 4, 23))
+
+    # Blank Name
+    n_in = st.text_input("Name", value="")
+
+    # Gender (no forced default)
+    g_in = st.selectbox("Gender", ["Select", "Male", "Female"])
+    if g_in == "Select":
+        g_in = ""
+
+    # Random DOB between 1900 and today (generated once per session)
+    today = datetime.date.today()
+
+    if "random_dob" not in st.session_state:
+        random_year = random.randint(1900, today.year)
+        random_month = random.randint(1, 12)
+        random_day = random.randint(1, 28)
+        st.session_state.random_dob = datetime.date(random_year, random_month, random_day)
+
+    d_in = st.date_input(
+        "Date of Birth",
+        value=st.session_state.random_dob,
+        min_value=datetime.date(1900, 1, 1),
+        max_value=today,
+        format="DD/MM/YYYY"
+    )
+
     c1, c2 = st.columns(2)
-    hr_in = c1.selectbox("Hour", range(24), index=15)
-    mn_in = c2.selectbox("Min", range(60), index=45)
-    city_in = st.text_input("City", "Kolkata, India")
-    
+    hr_in = c1.selectbox("Hour", range(24), index=12)
+    mn_in = c2.selectbox("Min", range(60), index=0)
+
+    # Smart City Search (Worldwide)
+    city_query = st.text_input("Search City", value="")
+    selected_city = None
+
+    if city_query and len(city_query) >= 2:
+        try:
+            results = geocoder.geocode(city_query, limit=5)
+            if results:
+                options = [r["formatted"] for r in results]
+                selected_city = st.selectbox("Select Matching City", options)
+        except:
+            pass
+
     if st.button("Generate Kundali", type="primary"):
         with st.spinner("Calculating 19 Charts..."):
             try:
-                res = geocoder.geocode(city_in)
+                # Use selected city if available, else fallback to typed city
+                city_to_use = selected_city if selected_city else city_query
+
+                if not city_to_use:
+                    st.error("Please enter or select a city.")
+                    st.stop()
+
+                res = geocoder.geocode(city_to_use)
+
                 if res:
                     lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
                     birth_dt = datetime.datetime.combine(d_in, datetime.time(hr_in, mn_in))
                     utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
-                    jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
+                    jd = swe.julday(
+                        utc_dt.year,
+                        utc_dt.month,
+                        utc_dt.day,
+                        utc_dt.hour + utc_dt.minute / 60.0
+                    )
+
                     swe.set_sid_mode(swe.SIDM_LAHIRI)
-                    
-                    charts, p_dets, kp_p, kp_c, ruling, summ, raw_b = get_planet_positions(jd, lat, lng, birth_dt, lang_opt)
-                    
+
+                    charts, p_dets, kp_p, kp_c, ruling, summ, raw_b = get_planet_positions(
+                        jd, lat, lng, birth_dt, lang_opt
+                    )
+
                     st.session_state.current_data = {
-                        "Name": n_in, "Gender": g_in, 
-                        "Charts": charts, "Planet_Details": p_dets,
-                        "KP_Planets": kp_p, "KP_Cusps": kp_c, "Ruling_Planets": ruling,
-                        "Summary": summ, "Raw_Bodies": raw_b, "JD": jd, "BirthDate": d_in
+                        "Name": n_in if n_in else "Guest",
+                        "Gender": g_in,
+                        "Charts": charts,
+                        "Planet_Details": p_dets,
+                        "KP_Planets": kp_p,
+                        "KP_Cusps": kp_c,
+                        "Ruling_Planets": ruling,
+                        "Summary": summ,
+                        "Raw_Bodies": raw_b,
+                        "JD": jd,
+                        "BirthDate": d_in
                     }
+
                     st.rerun()
-                else: st.error("City not found.")
-            except Exception as e: st.error(f"Error: {e}")
+                else:
+                    st.error("City not found.")
+
+            except Exception as e:
+                st.error(f"Error: {e}")
+                
 
 # --- 6. MAIN UI ---
 if st.session_state.current_data:

@@ -17,9 +17,6 @@ st.markdown("""
     .header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; text-align: center; font-weight: bold; margin-bottom: 20px;}
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
     .stSelectbox label { font-weight: bold; }
-    .interp-box { background-color: #0e1117; border: 1px solid #333; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
-    h3 { font-size: 1.2rem; font-weight: 600; margin-top: 1rem; }
-    .status-guide { font-size: 0.9rem; color: #cccccc; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -51,29 +48,104 @@ except: geocoder = None
 try: genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 except: pass
 
-# --- 3. SESSION STATE ---
+# --- 3. TRANSLATION ENGINE (ALL LANGUAGES) ---
+TRANSLATIONS = {
+    "English": {
+        "title": "TaraVaani", "create_profile": "Create Profile", "name": "Name", "gender": "Gender", "dob": "Date of Birth", "tob": "Time", "city": "City", "gen_btn": "Generate Kundali",
+        "tab_summary": "📝 Summary", "tab_charts": "🔮 Kundalis", "tab_dashas": "🗓️ Dashas", "tab_ai": "🤖 AI Prediction",
+        "basic_details": "Basic Details", "panchang": "Panchang & Avakahada", "planets": "Planetary Positions", "chart_style": "Chart Style",
+        "sun": "Sun", "moon": "Moon", "mars": "Mars", "merc": "Mercury", "jup": "Jupiter", "ven": "Venus", "sat": "Saturn", "rahu": "Rahu", "ketu": "Ketu", "asc": "Ascendant",
+        "exalted": "Exalted", "debilitated": "Debilitated", "own": "Own Sign", "friendly": "Friendly", "neutral": "Neutral", "enemy": "Enemy",
+        "mangalik_yes": "Yes (Mangalik)", "mangalik_no": "No"
+    },
+    "Hindi": {
+        "title": "तारावाणी", "create_profile": "प्रोफाइल बनाएं", "name": "नाम", "gender": "लिंग", "dob": "जन्म तिथि", "tob": "समय", "city": "स्थान", "gen_btn": "कुंडली बनाएं",
+        "tab_summary": "📝 सारांश", "tab_charts": "🔮 कुंडली", "tab_dashas": "🗓️ दशा", "tab_ai": "🤖 भविष्यफल",
+        "basic_details": "मूल विवरण", "panchang": "पंचांग और अवकहड़ा", "planets": "ग्रह स्थिति", "chart_style": "चार्ट शैली",
+        "sun": "सूर्य", "moon": "चंद्र", "mars": "मंगल", "merc": "बुध", "jup": "गुरु", "ven": "शुक्र", "sat": "शनि", "rahu": "राहु", "ketu": "केतु", "asc": "लग्न",
+        "exalted": "उच्च", "debilitated": "नीच", "own": "स्वराशि", "friendly": "मित्र", "neutral": "सम", "enemy": "शत्रु",
+        "mangalik_yes": "हाँ (मांगलिक)", "mangalik_no": "नहीं"
+    },
+    "Bengali": {
+        "title": "তারাবাণী", "create_profile": "প্রোফাইল তৈরি করুন", "name": "নাম", "gender": "লিঙ্গ", "dob": "জন্ম তারিখ", "tob": "সময়", "city": "স্থান", "gen_btn": "কোষ্ঠী তৈরি করুন",
+        "tab_summary": "📝 সারাংশ", "tab_charts": "🔮 কুষ্ঠি", "tab_dashas": "🗓️ দশা", "tab_ai": "🤖 ভবিষ্যৎবাণী",
+        "basic_details": "মৌলিক বিবরণ", "panchang": "পঞ্চাঙ্গ ও অবকহদা", "planets": "গ্রহের অবস্থান", "chart_style": "চার্ট ধরণ",
+        "sun": "রবি", "moon": "চন্দ্র", "mars": "মঙ্গল", "merc": "বুধ", "jup": "বৃহস্পতি", "ven": "শুক্র", "sat": "শনি", "rahu": "রাহু", "ketu": "কেতু", "asc": "লগ্ন",
+        "exalted": "উচ্চ", "debilitated": "নীচ", "own": "স্বরাশি", "friendly": "মিত্র", "neutral": "সম", "enemy": "শত্রু",
+        "mangalik_yes": "হ্যাঁ (মাঙ্গলিক)", "mangalik_no": "না"
+    },
+    "Marathi": {
+        "title": "तारावाणी", "create_profile": "प्रोफाइल तयार करा", "name": "नाव", "gender": "लिंग", "dob": "जन्म तारीख", "tob": "वेळ", "city": "ठिकाण", "gen_btn": "कुंडली बनवा",
+        "tab_summary": "📝 सारांश", "tab_charts": "🔮 कुंडली", "tab_dashas": "🗓️ दशा", "tab_ai": "🤖 भविष्य",
+        "basic_details": "मूलभूत माहिती", "panchang": "पंचांग आणि अवकहडा", "planets": "ग्रह स्थिती", "chart_style": "चार्ट प्रकार",
+        "sun": "सूर्य", "moon": "चंद्र", "mars": "मंगळ", "merc": "बुध", "jup": "गुरु", "ven": "शुक्र", "sat": "शनी", "rahu": "राहू", "ketu": "केतू", "asc": "लग्न",
+        "exalted": "उच्च", "debilitated": "नीच", "own": "स्वराशी", "friendly": "मित्र", "neutral": "सम", "enemy": "शत्रू",
+        "mangalik_yes": "हो (मांगलिक)", "mangalik_no": "नाही"
+    },
+    "Gujarati": {
+        "title": "તારાવાણી", "create_profile": "પ્રોફાઇલ બનાવો", "name": "નામ", "gender": "લિંગ", "dob": "જન્મ તારીખ", "tob": "સમય", "city": "સ્થળ", "gen_btn": "કુંડળી બનાવો",
+        "tab_summary": "📝 સારાંશ", "tab_charts": "🔮 કુંડળી", "tab_dashas": "🗓️ દશા", "tab_ai": "🤖 ભવિષ્યવાણી",
+        "basic_details": "મૂળભૂત વિગતો", "panchang": "પંચાંગ", "planets": "ગ્રહ સ્થિતિ", "chart_style": "ચાર્ટ શૈલી",
+        "sun": "સૂર્ય", "moon": "ચંદ્ર", "mars": "મંગળ", "merc": "બુધ", "jup": "ગુરુ", "ven": "શુક્ર", "sat": "શનિ", "rahu": "રાહુ", "ketu": "કેતુ", "asc": "લગ્ન",
+        "exalted": "ઉચ્ચ", "debilitated": "નીચ", "own": "સ્વરાશિ", "friendly": "મિત્ર", "neutral": "સમ", "enemy": "શત્રુ",
+        "mangalik_yes": "હા (માંગલિક)", "mangalik_no": "ના"
+    },
+    "Tamil": {
+        "title": "தாரா வாணி", "create_profile": "சுயவிவரம்", "name": "பெயர்", "gender": "பாலினம்", "dob": "பிறந்த தேதி", "tob": "நேரம்", "city": "இடம்", "gen_btn": "ஜாதகம் கணி",
+        "tab_summary": "📝 சுருக்கம்", "tab_charts": "🔮 கட்டம்", "tab_dashas": "🗓️ தசை", "tab_ai": "🤖 கணிப்பு",
+        "basic_details": "அடிப்படை விவரங்கள்", "panchang": "பஞ்சாங்கம்", "planets": "கிரக நிலை", "chart_style": "கட்ட வகை",
+        "sun": "சூரியன்", "moon": "சந்திரன்", "mars": "செவ்வாய்", "merc": "புதன்", "jup": "குரு", "ven": "சுக்கிரன்", "sat": "சனி", "rahu": "ராகு", "ketu": "கேது", "asc": "லக்னம்",
+        "exalted": "உச்சம்", "debilitated": "நீசம்", "own": "ஆட்சி", "friendly": "நட்பு", "neutral": "சமம்", "enemy": "பகை",
+        "mangalik_yes": "ஆம் (செவ்வாய் தோஷம்)", "mangalik_no": "இல்லை"
+    },
+    "Telugu": {
+        "title": "తారావాణి", "create_profile": "ప్రొఫైల్", "name": "పేరు", "gender": "లింగం", "dob": "పుట్టిన తేదీ", "tob": "సమయం", "city": "ప్రాంతం", "gen_btn": "జాతకం పొందండి",
+        "tab_summary": "📝 సారాంశం", "tab_charts": "🔮 చక్రం", "tab_dashas": "🗓️ దశ", "tab_ai": "🤖 జ్యోతిష్యం",
+        "basic_details": "ప్రాథమిక వివరాలు", "panchang": "పంచాంగం", "planets": "గ్రహ స్థితి", "chart_style": "చక్రం రకం",
+        "sun": "సూర్యుడు", "moon": "చంద్రుడు", "mars": "కుజుడు", "merc": "బుధుడు", "jup": "గురువు", "ven": "శుక్రుడు", "sat": "శని", "rahu": "రాహు", "ketu": "కేతు", "asc": "లగ్నం",
+        "exalted": "ఉచ్ఛ", "debilitated": "నీచ", "own": "స్వక్షేత్రం", "friendly": "మిత్ర", "neutral": "సమ", "enemy": "శత్రు",
+        "mangalik_yes": "అవును (కుజ దోషం)", "mangalik_no": "కాదు"
+    },
+    "Kannada": {
+        "title": "ತಾರಾವಾಣಿ", "create_profile": "ಪ್ರೊಫೈಲ್", "name": "ಹೆಸರು", "gender": "ಲಿಂಗ", "dob": "ದಿನಾಂಕ", "tob": "ಸಮಯ", "city": "ಸ್ಥಳ", "gen_btn": "ಜಾತಕ ನೋಡಿ",
+        "tab_summary": "📝 ಸಾರಾಂಶ", "tab_charts": "🔮 ಕುಂಡಲಿ", "tab_dashas": "🗓️ ದಶೆ", "tab_ai": "🤖 ಭವಿಷ್ಯ",
+        "basic_details": "ಮೂಲ ವಿವರಗಳು", "panchang": "ಪಂಚಾಂಗ", "planets": "ಗ್ರಹ ಸ್ಥಿತಿ", "chart_style": "ಶೈಲಿ",
+        "sun": "ಸೂರ್ಯ", "moon": "ಚಂದ್ರ", "mars": "ಮಂಗಳ", "merc": "ಬುಧ", "jup": "ಗುರು", "ven": "ಶುಕ್ರ", "sat": "ಶನಿ", "rahu": "ರಾಹು", "ketu": "ಕೇತು", "asc": "ಲಗ್ನ",
+        "exalted": "ಉಚ್ಛ", "debilitated": "ನೀಚ", "own": "ಸ್ವಕ್ಷೇತ್ರ", "friendly": "ಮಿತ್ರ", "neutral": "ಸಮ", "enemy": "ಶತ್ರು",
+        "mangalik_yes": "ಹೌದು (ಕುಜ ದೋಷ)", "mangalik_no": "ಇಲ್ಲ"
+    },
+    "Malayalam": {
+        "title": "താരാവാണി", "create_profile": "പ്രൊഫൈൽ", "name": "പേര്", "gender": "ലിംഗം", "dob": "തീയതി", "tob": "സമയം", "city": "സ്ഥലം", "gen_btn": "ജാതകം",
+        "tab_summary": "📝 സംഗ്രഹം", "tab_charts": "🔮 കുണ്ഡലി", "tab_dashas": "🗓️ ദശ", "tab_ai": "🤖 പ്രവചനം",
+        "basic_details": "അടിസ്ഥാന വിവരങ്ങൾ", "panchang": "പഞ്ചാംഗം", "planets": "ഗ്രഹനില", "chart_style": "ശൈലി",
+        "sun": "സൂര്യൻ", "moon": "ചന്ദ്രൻ", "mars": "ചൊവ്വ", "merc": "ബുധൻ", "jup": "വ്യാഴം", "ven": "ശുക്രൻ", "sat": "ശനി", "rahu": "രാഹു", "ketu": "കേതു", "asc": "ലഗ്നം",
+        "exalted": "ഉച്ചം", "debilitated": "നീചം", "own": "സ്വക്ഷേത്രം", "friendly": "മിത്രം", "neutral": "സമം", "enemy": "ശത്രു",
+        "mangalik_yes": "അതെ (ചൊവ്വാ ദോഷം)", "mangalik_no": "അല്ല"
+    }
+}
+
+def txt(key, lang):
+    """Retrives translated text"""
+    lang_dict = TRANSLATIONS.get(lang, TRANSLATIONS["English"])
+    return lang_dict.get(key, key)
+
+# --- 4. SESSION STATE ---
 if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin"
 if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-# --- 4. ASTROLOGY ENGINE ---
+# --- 5. ASTROLOGY ENGINE ---
 
 def get_nakshatra_properties(nak_name, rashi_name):
-    """Returns Varna, Vashya, Yoni, Gana, Nadi based on Nakshatra/Rashi"""
     ganas = {"Deva": ["Ashwini", "Mrigashira", "Punarvasu", "Pushya", "Hasta", "Swati", "Anuradha", "Shravana", "Revati"], "Manushya": ["Bharani", "Rohini", "Ardra", "Purva Phalguni", "Uttara Phalguni", "Purva Ashadha", "Uttara Ashadha", "Purva Bhadrapada", "Uttara Bhadrapada"], "Rakshasa": ["Krittika", "Ashlesha", "Magha", "Chitra", "Vishakha", "Jyeshtha", "Mula", "Dhanishta", "Shatabhisha"]}
     gana = next((g for g, naks in ganas.items() if nak_name in naks), "Unknown")
-
     yonis = {"Horse": ["Ashwini", "Shatabhisha"], "Elephant": ["Bharani", "Revati"], "Goat": ["Krittika", "Pushya"], "Snake": ["Rohini", "Mrigashira"], "Dog": ["Ardra", "Mula"], "Cat": ["Punarvasu", "Ashlesha"], "Rat": ["Magha", "Purva Phalguni"], "Cow": ["Uttara Phalguni", "Uttara Bhadrapada"], "Buffalo": ["Hasta", "Swati"], "Tiger": ["Chitra", "Vishakha"], "Deer": ["Anuradha", "Jyeshtha"], "Monkey": ["Purva Ashadha", "Shravana"], "Mongoose": ["Uttara Ashadha"], "Lion": ["Dhanishta", "Purva Bhadrapada"]}
     yoni = next((y for y, naks in yonis.items() if nak_name in naks), "Unknown")
-
     nadis = {"Adi (Vata)": ["Ashwini", "Ardra", "Punarvasu", "Uttara Phalguni", "Hasta", "Jyeshtha", "Mula", "Shatabhisha", "Purva Bhadrapada"], "Madhya (Pitta)": ["Bharani", "Mrigashira", "Pushya", "Purva Phalguni", "Chitra", "Anuradha", "Purva Ashadha", "Dhanishta", "Uttara Bhadrapada"], "Antya (Kapha)": ["Krittika", "Rohini", "Ashlesha", "Magha", "Swati", "Vishakha", "Uttara Ashadha", "Shravana", "Revati"]}
     nadi = next((n for n, naks in nadis.items() if nak_name in naks), "Unknown")
-
     rashi_props = {"Aries": ("Kshatriya", "Chatushpad"), "Taurus": ("Vaishya", "Chatushpad"), "Gemini": ("Shudra", "Manav"), "Cancer": ("Brahmin", "Jalchar"), "Leo": ("Kshatriya", "Vanchar"), "Virgo": ("Vaishya", "Manav"), "Libra": ("Shudra", "Manav"), "Scorpio": ("Brahmin", "Keet"), "Sagittarius": ("Kshatriya", "Manav/Chatushpad"), "Capricorn": ("Vaishya", "Jalchar"), "Aquarius": ("Shudra", "Manav"), "Pisces": ("Brahmin", "Jalchar")}
     varna, vashya = rashi_props.get(rashi_name, ("Unknown", "Unknown"))
-    
     lords = {"Aries": "Mars", "Taurus": "Venus", "Gemini": "Mercury", "Cancer": "Moon", "Leo": "Sun", "Virgo": "Mercury", "Libra": "Venus", "Scorpio": "Mars", "Sagittarius": "Jupiter", "Capricorn": "Saturn", "Aquarius": "Saturn", "Pisces": "Jupiter"}
     lord = lords.get(rashi_name, "Unknown")
-
     return {"Varna": varna, "Vashya": vashya, "Yoni": yoni, "Gana": gana, "Nadi": nadi, "SignLord": lord}
 
 def calculate_panchang(jd, lat, lon, birth_dt):
@@ -83,122 +155,74 @@ def calculate_panchang(jd, lat, lon, birth_dt):
         sunset = swe.jdut1_to_utc(res[1][1], 1)
         sr_time = f"{int(sunrise[3]):02d}:{int(sunrise[4]):02d}:{int(sunrise[5]):02d}"
         ss_time = f"{int(sunset[3]):02d}:{int(sunset[4]):02d}:{int(sunset[5]):02d}"
-    except:
-        sr_time, ss_time = "Unknown", "Unknown"
-
+    except: sr_time, ss_time = "Unknown", "Unknown"
     sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
     moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-    
     diff = (moon_pos - sun_pos) % 360
     tithi_num = int(diff / 12) + 1
     paksha = "Shukla" if tithi_num <= 15 else "Krishna"
     tithi_name = f"{paksha} {tithi_num if tithi_num <= 15 else tithi_num - 15}"
-
     total = (moon_pos + sun_pos) % 360
     yoga_num = int(total / (13 + 20/60)) + 1
     yogas = ["Vishkumbha", "Priti", "Ayushman", "Saubhagya", "Sobhana", "Atiganda", "Sukarma", "Dhriti", "Shula", "Ganda", "Vriddhi", "Dhruva", "Vyaghata", "Harshana", "Vajra", "Siddhi", "Vyatipata", "Variyan", "Parigha", "Shiva", "Siddha", "Sadhya", "Shubha", "Shukla", "Brahma", "Indra", "Vaidhriti"]
     yoga_name = yogas[yoga_num - 1] if 0 < yoga_num <= 27 else "Unknown"
-
     karan_num = int(diff / 6) + 1
     karan_name = f"Karana {karan_num}"
     ayanamsa = swe.get_ayanamsa_ut(jd)
-
     return {"Sunrise": sr_time, "Sunset": ss_time, "Tithi": tithi_name, "Yoga": yoga_name, "Karan": karan_name, "Ayanamsa": f"{ayanamsa:.2f}°"}
 
 def get_navamsa_pos(deg):
-    """Calculates Navamsa Sign from Degree"""
     abs_deg = deg 
     sign_idx = int(abs_deg / 30) 
     deg_in_sign = abs_deg % 30
     nav_num = int(deg_in_sign / (30/9)) 
-    
-    moveable = [0, 4, 8] # Ar, Leo, Sag
-    fixed = [1, 5, 9]    # Ta, Vir, Cap
-    dual = [2, 6, 10]    # Ge, Lib, Aq
-    water = [3, 7, 11]   # Cn, Sc, Pi 
-    
+    moveable, fixed, dual = [0, 4, 8], [1, 5, 9], [2, 6, 10]
     if sign_idx in moveable: base = 0
     elif sign_idx in fixed: base = 9
     elif sign_idx in dual: base = 6
     else: base = 3
-    
     nav_sign_idx = (base + nav_num) % 12
     return nav_sign_idx + 1
 
 def get_planet_status(planet, sign_name):
-    """Determines planet status (Own, Exalted, Debilitated, Friendly, Enemy)"""
-    
-    # Sign mapping
     sign_map = {"Aries":1, "Taurus":2, "Gemini":3, "Cancer":4, "Leo":5, "Virgo":6, "Libra":7, "Scorpio":8, "Sagittarius":9, "Capricorn":10, "Aquarius":11, "Pisces":12}
     s_id = sign_map.get(sign_name, 0)
+    if planet in ["Ascendant", "Uranus", "Neptune", "Pluto"]: return "--"
     
-    if planet == "Ascendant" or planet == "Uranus" or planet == "Neptune" or planet == "Pluto": return "--"
-    
-    # 1. Own Sign
     own = {"Sun":[5], "Moon":[4], "Mars":[1,8], "Merc":[3,6], "Jup":[9,12], "Ven":[2,7], "Sat":[10,11], "Rahu":[], "Ketu":[]}
-    if s_id in own.get(planet, []): return "Own Sign"
-    
-    # 2. Exalted
     exalted = {"Sun":1, "Moon":2, "Mars":10, "Merc":6, "Jup":4, "Ven":12, "Sat":7, "Rahu":2, "Ketu":8}
-    if exalted.get(planet) == s_id: return "Exalted"
-    
-    # 3. Debilitated (Opposite of Exalted)
     debilitated = {"Sun":7, "Moon":8, "Mars":4, "Merc":12, "Jup":10, "Ven":6, "Sat":1, "Rahu":8, "Ketu":2}
-    if debilitated.get(planet) == s_id: return "Debilitated"
+    friends = {"Sun":[4,1,8,9,12], "Moon":[5,3,6], "Mars":[5,4,9,12], "Merc":[5,2,7], "Jup":[5,4,1,8], "Ven":[3,6,10,11], "Sat":[3,6,2,7], "Rahu":[3,6,2,7,10,11], "Ketu":[1,8,9,12]}
+    enemies = {"Sun":[2,7,10,11], "Moon":[], "Mars":[3,6], "Merc":[4], "Jup":[3,6,2,7], "Ven":[5,4], "Sat":[5,4,1,8], "Rahu":[5,4,1], "Ketu":[5,4]}
     
-    # 4. Friends (Natural) - Simplified
-    friends = {
-        "Sun": [4, 1, 8, 9, 12], # Moon, Mars, Jup
-        "Moon": [5, 3, 6], # Sun, Merc
-        "Mars": [5, 4, 9, 12], # Sun, Moon, Jup
-        "Merc": [5, 2, 7], # Sun, Ven
-        "Jup": [5, 4, 1, 8], # Sun, Moon, Mars
-        "Ven": [3, 6, 10, 11], # Merc, Sat
-        "Sat": [3, 6, 2, 7], # Merc, Ven
-        "Rahu": [3, 6, 2, 7, 10, 11], 
-        "Ketu": [1, 8, 9, 12]
-    }
-    
-    if s_id in friends.get(planet, []): return "Friendly"
-    
-    # 5. Enemies (Natural) - Simplified
-    enemies = {
-        "Sun": [2, 7, 10, 11], # Ven, Sat
-        "Moon": [], # No enemies
-        "Mars": [3, 6], # Merc
-        "Merc": [4], # Moon
-        "Jup": [3, 6, 2, 7], # Merc, Ven
-        "Ven": [5, 4], # Sun, Moon
-        "Sat": [5, 4, 1, 8], # Sun, Moon, Mars
-        "Rahu": [5, 4, 1],
-        "Ketu": [5, 4]
-    }
-    if s_id in enemies.get(planet, []): return "Enemy"
-    
-    return "Neutral"
+    if s_id in own.get(planet, []): return "own"
+    if exalted.get(planet) == s_id: return "exalted"
+    if debilitated.get(planet) == s_id: return "debilitated"
+    if s_id in friends.get(planet, []): return "friendly"
+    if s_id in enemies.get(planet, []): return "enemy"
+    return "neutral"
 
-def get_planet_positions(jd, lat, lon, birth_dt):
+def get_planet_positions(jd, lat, lon, birth_dt, lang):
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
     asc_deg = (ascmc[0] - ayanamsa) % 360
     asc_sign = int(asc_deg // 30) + 1 
     asc_nav = get_navamsa_pos(asc_deg)
 
-    planet_map = {0:"Sun", 1:"Moon", 4:"Mars", 2:"Merc", 5:"Jup", 3:"Ven", 6:"Sat", 11:"Rahu", 10:"Ketu"}
-    
+    planet_map = {0:"sun", 1:"moon", 4:"mars", 2:"merc", 5:"jup", 3:"ven", 6:"sat", 11:"rahu", 10:"ketu"}
     house_planets_d1 = {i: [] for i in range(1, 13)}
     house_planets_d9 = {i: [] for i in range(1, 13)}
-    
     planet_details = []
+    
     nak_list = ["Ashwini","Bharani","Krittika","Rohini","Mrigashira","Ardra","Punarvasu","Pushya","Ashlesha","Magha","Purva Phalguni","Uttara Phalguni","Hasta","Chitra","Swati","Vishakha","Anuradha","Jyeshtha","Mula","Purva Ashadha","Uttara Ashadha","Shravana","Dhanishta","Shatabhisha","Purva Bhadrapada","Uttara Bhadrapada","Revati"]
     nak_lords = ["Ketu","Venus","Sun","Moon","Mars","Rahu","Jupiter","Saturn","Mercury"] * 3
     zodiac_list = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"]
     sign_lords = ["Mars","Venus","Mercury","Moon","Sun","Mercury","Venus","Mars","Jupiter","Saturn","Saturn","Jupiter"]
 
-    mars_house = 0 # To track Mangalik
+    mars_house = 0
 
-    for pid, name in planet_map.items():
-        if name == "Ketu":
+    for pid, code in planet_map.items():
+        if code == "ketu":
             rahu_pos = swe.calc_ut(jd, 11, swe.FLG_SIDEREAL)[0][0]
             pos = (rahu_pos + 180) % 360
             speed = 0
@@ -209,17 +233,17 @@ def get_planet_positions(jd, lat, lon, birth_dt):
             
         sign = int(pos // 30) + 1 
         deg = pos % 30
-        
         house_d1 = ((sign - asc_sign) % 12) + 1
-        house_planets_d1[house_d1].append(name)
         
-        # Track Mars for Mangalik
-        if name == "Mars":
-            mars_house = house_d1
+        # Localized Planet Name for Chart
+        p_name_local = txt(code, lang)
+        house_planets_d1[house_d1].append(p_name_local)
+        
+        if code == "mars": mars_house = house_d1
         
         nav_sign = get_navamsa_pos(pos)
         house_d9 = ((nav_sign - asc_nav) % 12) + 1
-        house_planets_d9[house_d9].append(name)
+        house_planets_d9[house_d9].append(p_name_local)
         
         nak_idx = int(pos / (360/27)) % 27
         nak_name = nak_list[nak_idx]
@@ -228,35 +252,40 @@ def get_planet_positions(jd, lat, lon, birth_dt):
         sign_lord = sign_lords[sign-1]
         
         is_retro = "Retro" if speed < 0 else "Direct"
-        status = get_planet_status(name, sign_name)
+        status_key = get_planet_status(code, sign_name) # returns key like 'exalted'
+        status_display = txt(status_key, lang) # Localized status
         
         planet_details.append({
-            "Planet": name, "Sign": sign_name, "Sign Lord": sign_lord, 
+            "Planet": p_name_local, "Sign": sign_name, "Sign Lord": sign_lord, 
             "Nakshatra": nak_name, "Naksh Lord": nak_lord, "Degree": f"{int(deg)}°{int((deg%1)*60)}'",
-            "Retro": is_retro, "House": house_d1, "Status": status
+            "Retro": is_retro, "House": house_d1, "Status": status_display
         })
 
     l_sign_name = zodiac_list[asc_sign-1]
     
+    # Ascendant Row
     planet_details.insert(0, {
-        "Planet": "Ascendant", "Sign": l_sign_name, "Sign Lord": sign_lords[asc_sign-1],
+        "Planet": txt("asc", lang), "Sign": l_sign_name, "Sign Lord": sign_lords[asc_sign-1],
         "Nakshatra": nak_list[int(asc_deg/(360/27)%27)], "Naksh Lord": nak_lords[int(asc_deg/(360/27)%27)],
         "Degree": f"{int(asc_deg%30)}°{int((asc_deg%30%1)*60)}'", "Retro": "--", "House": 1, "Status": "--"
     })
 
-    moon_data = next((p for p in planet_details if p['Planet']=='Moon'), None)
+    # Mangalik Logic
+    is_mangalik = txt("mangalik_yes", lang) if mars_house in [1, 4, 7, 8, 12] else txt("mangalik_no", lang)
     
-    # Mangalik Check (Mars in 1, 4, 7, 8, 12 from Lagna)
-    is_mangalik = "Yes" if mars_house in [1, 4, 7, 8, 12] else "No"
+    # Moon for Panchang
+    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
+    moon_sign_idx = int(moon_pos // 30)
+    moon_nak_idx = int(moon_pos / (360/27)) % 27
     
     summary = {
         "Lagna": l_sign_name,
-        "Rashi": moon_data['Sign'] if moon_data else "Unknown",
-        "Nakshatra": moon_data['Nakshatra'] if moon_data else "Unknown",
+        "Rashi": zodiac_list[moon_sign_idx],
+        "Nakshatra": nak_list[moon_nak_idx],
         "Charan": 1, 
         "Mangalik": is_mangalik,
         **calculate_panchang(jd, lat, lon, birth_dt),
-        **get_nakshatra_properties(moon_data['Nakshatra'], moon_data['Sign']),
+        **get_nakshatra_properties(nak_list[moon_nak_idx], zodiac_list[moon_sign_idx]),
         "Asc_Sign_ID": asc_sign 
     }
 
@@ -283,6 +312,7 @@ def draw_chart(house_planets, asc_sign, style="North", title="Lagna Chart"):
             sign_num = ((asc_sign + h - 2) % 12) + 1
             ax.text(x, y-0.08, str(sign_num), fontsize=8, color='red', ha='center')
             if house_planets[h]:
+                # Use a font that supports generic unicode, but Matplotlib default is okay for many
                 ax.text(x, y, "\n".join(house_planets[h]), fontsize=7, fontweight='bold', ha='center', va='center')
     else:
         for i in [0, 0.25, 0.5, 0.75, 1]:
@@ -341,19 +371,23 @@ def get_sub_periods(lord_name, start_date, level_years):
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
+    
+    # UI LANGUAGE SELECTION
     lang_opt = st.selectbox("Language", ["English", "Hindi", "Bengali", "Marathi", "Tamil", "Telugu", "Kannada", "Gujarati", "Malayalam"])
-    st.header("Profile")
-    n_in = st.text_input("Name", "Suman Naskar")
-    g_in = st.selectbox("Gender", ["Male", "Female"])
-    d_in = st.date_input("DOB", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900,1,1), format="DD/MM/YYYY")
+    
+    st.header(txt("create_profile", lang_opt))
+    n_in = st.text_input(txt("name", lang_opt), "Suman Naskar")
+    g_in = st.selectbox(txt("gender", lang_opt), ["Male", "Female"])
+    d_in = st.date_input(txt("dob", lang_opt), value=datetime.date(1993, 4, 23), min_value=datetime.date(1900,1,1), format="DD/MM/YYYY")
     c1, c2 = st.columns(2)
     hr_in = c1.selectbox("Hour", range(24), index=15)
     mn_in = c2.selectbox("Min", range(60), index=45)
-    city_in = st.text_input("City", "Kolkata, India")
+    city_in = st.text_input(txt("city", lang_opt), "Kolkata, India")
+    
     with st.expander("⚙️ Advanced Settings"):
         ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
     
-    if st.button("Generate Kundali", type="primary"):
+    if st.button(txt("gen_btn", lang_opt), type="primary"):
         with st.spinner("Calculating..."):
             try:
                 res = geocoder.geocode(city_in)
@@ -366,7 +400,8 @@ with st.sidebar:
                     elif "Raman" in ayanamsa_opt: swe.set_sid_mode(swe.SIDM_RAMAN)
                     elif "KP" in ayanamsa_opt: swe.set_sid_mode(5)
                     
-                    hp_d1, hp_d9, asc_s, asc_n, p_dets, summ = get_planet_positions(jd, lat, lng, birth_dt)
+                    # Pass Language to Planet Calculator
+                    hp_d1, hp_d9, asc_s, asc_n, p_dets, summ = get_planet_positions(jd, lat, lng, birth_dt, lang_opt)
                     
                     st.session_state.current_data = {
                         "Name": n_in, "Gender": g_in, 
@@ -383,31 +418,30 @@ with st.sidebar:
 if st.session_state.current_data:
     d = st.session_state.current_data
     
-    # SAFETY CHECK: Only works if "Mangalik" is in summary
-    if 'Summary' not in d or 'Mangalik' not in d['Summary']:
-        st.warning("⚠️ Data structure updated. Please click 'Generate Kundali' in the sidebar to refresh.")
+    if 'House_Planets_D1' not in d:
+        st.warning("⚠️ Update applied. Click 'Generate' again.")
         st.stop()
     
-    tab1, tab2, tab3, tab4 = st.tabs(["📝 Summary", "🔮 Kundalis", "🗓️ Dashas", "🤖 AI Prediction"])
+    tab1, tab2, tab3, tab4 = st.tabs([txt("tab_summary", lang_opt), txt("tab_charts", lang_opt), txt("tab_dashas", lang_opt), txt("tab_ai", lang_opt)])
     
     # 1. SUMMARY TAB
     with tab1:
-        st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="header-box">{d["Name"]} 🙏</div>', unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
-            st.subheader("Basic Details")
-            st.write(f"**Name:** {d['Name']}")
+            st.subheader(txt("basic_details", lang_opt))
+            st.write(f"**{txt('name', lang_opt)}:** {d['Name']}")
             st.write(f"**Date:** {d['BirthDate'].strftime('%d %B %Y')}")
             st.write(f"**Place:** {city_in}")
             if d['Summary']['Sunrise'] != "Unknown": st.write(f"**Sunrise:** {d['Summary']['Sunrise']}")
             if d['Summary']['Sunset'] != "Unknown": st.write(f"**Sunset:** {d['Summary']['Sunset']}")
             st.write(f"**Ayanamsa:** {d['Summary']['Ayanamsa']}")
         with c2:
-            st.subheader("Panchang & Avakahada")
+            st.subheader(txt("panchang", lang_opt))
             st.write(f"**Lagna:** {d['Summary']['Lagna']}")
             st.write(f"**Rashi:** {d['Summary']['Rashi']}")
-            st.write(f"**Nakshatra:** {d['Summary']['Nakshatra']} (Pada {d['Summary']['Charan']})")
-            st.write(f"**Mangalik:** {d['Summary']['Mangalik']}")  # Added
+            st.write(f"**Nakshatra:** {d['Summary']['Nakshatra']}")
+            st.write(f"**Mangalik:** {d['Summary']['Mangalik']}")
             st.write(f"**Varna:** {d['Summary']['Varna']}")
             st.write(f"**Yoni:** {d['Summary']['Yoni']}")
             st.write(f"**Gana:** {d['Summary']['Gana']}")
@@ -417,7 +451,7 @@ if st.session_state.current_data:
     
     # 2. KUNDALIS TAB
     with tab2:
-        c_type = st.selectbox("Chart Style:", ["North Indian", "South Indian"])
+        c_type = st.selectbox(txt("chart_style", lang_opt), ["North Indian", "South Indian"])
         c1, c2 = st.columns(2)
         style_code = "North" if "North" in c_type else "South"
         with c1:
@@ -428,31 +462,18 @@ if st.session_state.current_data:
             st.pyplot(fig9)
             
         st.divider()
-        st.subheader("Planetary Details")
+        st.subheader(txt("planets", lang_opt))
         df = pd.DataFrame(d['Planet_Details'])
         st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        # --- PLANETARY STATUS REFERENCE ---
-        st.divider()
-        st.subheader("Planetary Status Guide")
-        
-        with st.expander("What do these statuses mean?", expanded=True):
-            st.markdown("""
-            * **Exalted (Ucha):** The planet is at its highest power and strongest position. Results are generally excellent.
-            * **Debilitated (Neecha):** The planet is at its lowest power and weakest position. Results may be weak or challenging.
-            * **Own Sign (Swakshetra):** The planet is in its own house (like being at home). It is comfortable, strong, and confident.
-            * **Friendly (Mitra):** The planet is in a friend's house. It functions well and cooperatively.
-            * **Neutral (Sama):** The planet is in a neutral house. It gives average or mixed results.
-            * **Enemy (Shatru):** The planet is in an enemy's house. It feels uncomfortable, restricted, or agitated.
-            """)
 
     # 3. DASHA TAB
     with tab3:
-        st.markdown("### Vimshottari Dasha Analysis")
+        st.markdown("### Vimshottari Dasha")
         md_list = calculate_vimshottari_structure(d['JD'], d['BirthDate'])
-        md_data = [{"Lord": m['Lord'], "Start": m['Start'].strftime('%d-%b-%Y'), "End": m['End'].strftime('%d-%b-%Y'), "Duration": f"{m['FullYears']} Yrs"} for m in md_list]
+        md_data = [{"Lord": m['Lord'], "Start": m['Start'].strftime('%d-%b-%Y'), "End": m['End'].strftime('%d-%b-%Y')} for m in md_list]
         st.dataframe(pd.DataFrame(md_data), use_container_width=True)
         
+        # Selectors logic remains similar but could be translated if needed
         md_opts = [f"{m['Lord']} ({m['Start'].year}-{m['End'].year})" for m in md_list]
         sel_md_idx = st.selectbox("⬇️ Select Mahadasha:", range(len(md_list)), format_func=lambda x: md_opts[x])
         sel_md = md_list[sel_md_idx]

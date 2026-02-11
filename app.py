@@ -57,9 +57,6 @@ if 'current_data' not in st.session_state: st.session_state.current_data = None
 
 def get_nakshatra_properties(nak_name, rashi_name):
     """Returns Varna, Vashya, Yoni, Gana, Nadi based on Nakshatra/Rashi"""
-    # Static lookup for Nakshatra properties
-    # (Simplified logic for the main attributes)
-    
     # 1. GANA (Nature)
     ganas = {
         "Deva": ["Ashwini", "Mrigashira", "Punarvasu", "Pushya", "Hasta", "Swati", "Anuradha", "Shravana", "Revati"],
@@ -138,7 +135,6 @@ def calculate_panchang(jd, lat, lon, birth_dt):
 
     # KARAN
     karan_num = int(diff / 6) + 1
-    # Simplified Karan name mapping logic would go here, providing generic for now
     karan_name = f"Karana {karan_num}"
 
     # AYANAMSA
@@ -269,7 +265,7 @@ def draw_south_indian_chart(planet_details):
         if sign_planets[sign]: ax.text(x, y, "\n".join(sign_planets[sign]), ha='center', va='center', fontsize=8, fontweight='bold')
     return fig
 
-# --- DASHA ENGINE ---
+# --- DASHA ENGINE (6 LEVELS) ---
 def calculate_vimshottari_structure(jd, birth_date):
     moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
     nak_deg = (moon_pos * (27/360)) 
@@ -343,7 +339,6 @@ with st.sidebar:
                     elif "Raman" in ayanamsa_opt: swe.set_sid_mode(swe.SIDM_RAMAN)
                     elif "KP" in ayanamsa_opt: swe.set_sid_mode(5)
                     
-                    # Pass birth_dt for Panchang calc
                     house_planets, asc_sign, planet_details, summary = get_planet_positions(jd, lat, lng, birth_dt)
                     
                     st.session_state.current_data = {
@@ -378,8 +373,13 @@ if st.session_state.current_data:
             st.write(f"**Name:** {d['Name']}")
             st.write(f"**Date:** {d['BirthDate'].strftime('%d %B %Y')}")
             st.write(f"**Place:** {city_in}")
-            st.write(f"**Sunrise:** {d['Summary']['Sunrise']}")
-            st.write(f"**Sunset:** {d['Summary']['Sunset']}")
+            
+            # --- CONDITIONAL SUNRISE/SUNSET ---
+            if d['Summary']['Sunrise'] != "Unknown":
+                st.write(f"**Sunrise:** {d['Summary']['Sunrise']}")
+            if d['Summary']['Sunset'] != "Unknown":
+                st.write(f"**Sunset:** {d['Summary']['Sunset']}")
+                
             st.write(f"**Ayanamsa:** {d['Summary']['Ayanamsa']}")
             
         with c2:
@@ -550,3 +550,4 @@ if st.session_state.current_data:
 else:
     st.title("☸️ TaraVaani")
     st.info("👈 Enter details to generate chart.")
+

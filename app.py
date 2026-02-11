@@ -17,6 +17,7 @@ st.markdown("""
     .header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; text-align: center; font-weight: bold; margin-bottom: 20px;}
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
     .stSelectbox label { font-weight: bold; }
+    .interp-box { background-color: #0e1117; border: 1px solid #333; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -55,30 +56,13 @@ if 'current_data' not in st.session_state: st.session_state.current_data = None
 # --- 4. ASTROLOGY ENGINE ---
 
 def get_gana_yoni(nak):
-    """Restored logic for Gana and Yoni"""
     data = {
-        "Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"),
-        "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"),
-        "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"),
-        "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"),
-        "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"),
-        "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"),
-        "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"),
-        "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"),
-        "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"),
-        "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"),
-        "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"),
-        "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"),
-        "Purva Bhadrapada": ("Manushya", "Lion"),
-        "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")
+        "Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"), "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"), "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"), "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"), "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"), "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"), "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"), "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"), "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"), "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"), "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"), "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"), "Purva Bhadrapada": ("Manushya", "Lion"), "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")
     }
     return data.get(nak, ("Unknown", "Unknown"))
 
 def get_planet_positions(jd, lat, lon):
-    """Calculates planet positions - NOW USES LAT/LON for correct Lagna"""
     ayanamsa = swe.get_ayanamsa_ut(jd)
-    
-    # FIX: We now pass lat/lon here to get the correct Ascendant for the specific city
     cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
     asc_deg = (ascmc[0] - ayanamsa) % 360
     asc_sign = int(asc_deg // 30) + 1 
@@ -113,7 +97,6 @@ def get_planet_positions(jd, lat, lon):
 
     l_sign_name = zodiac_list[asc_sign-1]
     
-    # Get Moon details for Gana/Yoni
     moon_data = next((p for p in planet_details if p['Name']=='Moon'), None)
     moon_sign = moon_data['SignName'] if moon_data else "Unknown"
     moon_nak = moon_data['Nakshatra'] if moon_data else "Unknown"
@@ -125,12 +108,31 @@ def get_planet_positions(jd, lat, lon):
         "Rashi": moon_sign,
         "Nakshatra": moon_nak,
         "Gana": gana,
-        "Yoni": yoni
+        "Yoni": yoni,
+        "Asc_Sign_ID": asc_sign 
     }
 
     return house_planets, asc_sign, planet_details, summary
 
-# --- CHART DRAWING ---
+# --- STATIC INTERPRETATIONS ---
+def get_chart_interpretations(asc_sign_id):
+    interpretations = {
+        1: {"Personality": "Energetic, courageous, impatient, and direct. You are a natural leader but can be impulsive.", "Physical": "Medium height, athletic build, ruddy complexion, possibly a prominent head or face.", "Career": "Military, police, engineering, sports, or any field requiring initiative.", "Health": "Prone to headaches, fevers, and injuries to the head.", "Rel": "Passionate and protective, but may be argumentative."},
+        2: {"Personality": "Reliable, patient, practical, and devoted. You love luxury and stability but can be stubborn.", "Physical": "Solid build, thick neck, attractive face, clear eyes.", "Career": "Banking, arts, cooking, farming, or luxury goods.", "Health": "Throat issues, thyroid problems, or weight gain.", "Rel": "Loyal and sensual, seeks long-term stability."},
+        3: {"Personality": "Adaptable, outgoing, and intelligent. You love communication but can be indecisive.", "Physical": "Tall, slender, quick movements, expressive hands.", "Career": "Journalism, writing, sales, teaching, or IT.", "Health": "Respiratory issues, nervous system disorders, or arm injuries.", "Rel": "Fun-loving and flirtatious, needs intellectual stimulation."},
+        4: {"Personality": "Emotional, intuitive, and nurturing. You are attached to home and family but can be moody.", "Physical": "Round face, soft features, tendency to gain weight in midsection.", "Career": "Nursing, teaching, real estate, hospitality, or history.", "Health": "Stomach issues, digestive problems, or chest congestion.", "Rel": "Deeply caring and protective, seeks emotional security."},
+        5: {"Personality": "Confident, generous, and creative. You love attention and leading but can be arrogant.", "Physical": "Broad shoulders, majestic appearance, prominent chin or nose.", "Career": "Politics, entertainment, management, or government.", "Health": "Heart issues, back problems, or blood pressure.", "Rel": "Passionate and dramatic, needs admiration and loyalty."},
+        6: {"Personality": "Analytical, meticulous, and practical. You are a perfectionist but can be overly critical.", "Physical": "Slender build, youthful appearance, sharp features.", "Career": "Accounting, medicine, editing, service, or coding.", "Health": "Digestive issues, intestinal problems, or nervous tension.", "Rel": "Practical and devoted, serves their partner but may nitpick."},
+        7: {"Personality": "Diplomatic, charming, and social. You value harmony but can be indecisive.", "Physical": "Well-proportioned body, attractive smile, pleasing appearance.", "Career": "Law, fashion, design, diplomacy, or counseling.", "Health": "Kidney issues, lower back pain, or skin problems.", "Rel": "Romantic and partnership-oriented, hates being alone."},
+        8: {"Personality": "Intense, secretive, and magnetic. You are determined but can be possessive.", "Physical": "Strong build, piercing eyes, prominent brows.", "Career": "Research, surgery, occult, detective work, or mining.", "Health": "Reproductive system issues, bladder problems, or hidden ailments.", "Rel": "Deeply emotional and loyal, but prone to jealousy."},
+        9: {"Personality": "Optimistic, adventurous, and philosophical. You love freedom but can be blunt.", "Physical": "Tall, athletic, broad forehead, jovial expression.", "Career": "Teaching, publishing, religion, travel, or law.", "Health": "Hip/thigh injuries, liver issues, or weight gain.", "Rel": "Fun and adventurous, needs freedom in relationships."},
+        10: {"Personality": "Disciplined, ambitious, and practical. You work hard but can be pessimistic.", "Physical": "Lean build, prominent knees, serious expression.", "Career": "Business, administration, construction, or mining.", "Health": "Knee problems, skin issues, or arthritis.", "Rel": "Responsible and committed, takes relationships seriously."},
+        11: {"Personality": "Innovative, friendly, and humanitarian. You value intellect but can be detached.", "Physical": "Tall, unique features, possibly erratic movements.", "Career": "Technology, science, social work, or aviation.", "Health": "Ankle issues, circulation problems, or nervous disorders.", "Rel": "Friendly and unconventional, values friendship over romance."},
+        12: {"Personality": "Compassionate, imaginative, and sensitive. You are spiritual but can be escapist.", "Physical": "Soft features, dreamy eyes, possibly shorter stature.", "Career": "Film, photography, spirituality, healing, or charity.", "Health": "Foot issues, lymphatic problems, or sleep disorders.", "Rel": "Idealistic and self-sacrificing, seeks a soul connection."}
+    }
+    return interpretations.get(asc_sign_id, {})
+
+# --- VISUALIZATION ---
 def draw_north_indian_chart(house_planets, asc_sign):
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.set_aspect('equal')
@@ -170,7 +172,7 @@ def draw_south_indian_chart(planet_details):
         if sign_planets[sign]: ax.text(x, y, "\n".join(sign_planets[sign]), ha='center', va='center', fontsize=8, fontweight='bold')
     return fig
 
-# --- DASHA ENGINE ---
+# --- DASHA ENGINE (6 LEVELS) ---
 def calculate_vimshottari_structure(jd, birth_date):
     moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
     nak_deg = (moon_pos * (27/360)) 
@@ -181,7 +183,6 @@ def calculate_vimshottari_structure(jd, birth_date):
     years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
     
     start_lord_idx = nak_idx % 9
-    
     dashas = []
     curr_date = birth_date
     
@@ -194,7 +195,6 @@ def calculate_vimshottari_structure(jd, birth_date):
         dur = years[idx]
         dashas.append({"Lord": lords[idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=dur*365.25), "FullYears": dur})
         curr_date = dashas[-1]['End']
-        
     return dashas
 
 def get_sub_periods(lord_name, start_date, level_years):
@@ -246,7 +246,6 @@ with st.sidebar:
                     elif "Raman" in ayanamsa_opt: swe.set_sid_mode(swe.SIDM_RAMAN)
                     elif "KP" in ayanamsa_opt: swe.set_sid_mode(5)
                     
-                    # Pass LAT/LON to get correct Lagna
                     house_planets, asc_sign, planet_details, summary = get_planet_positions(jd, lat, lng)
                     
                     st.session_state.current_data = {
@@ -272,66 +271,90 @@ if st.session_state.current_data:
     
     tab1, tab2, tab3, tab4 = st.tabs(["📝 Summary", "📊 Charts", "🗓️ Dashas", "🤖 AI Prediction"])
     
-    # 1. SUMMARY TAB (Restored Gana/Yoni)
+    # 1. SUMMARY TAB
     with tab1:
         st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
-        
-        # Row 1: Key Metrics
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Lagna", d['Summary']['Lagna'])
         c2.metric("Rashi", d['Summary']['Rashi'])
         c3.metric("Nakshatra", d['Summary']['Nakshatra'])
         c4.metric("Gana", d['Summary']['Gana'])
         c5.metric("Yoni", d['Summary']['Yoni'])
-        
         st.divider()
         st.subheader("Planetary Positions")
         p_data = {p['Name']: f"{p['SignName']} ({p['Deg']:.2f}°)" for p in d['Planet_Details']}
         st.table(pd.DataFrame(p_data.items(), columns=["Planet", "Position"]))
         
-    # 2. CHARTS TAB
+    # 2. CHARTS TAB (With Interpretations)
     with tab2:
         c_type = st.selectbox("Select Chart Style:", ["North Indian (Diamond)", "South Indian (Square)"])
         
         if "North" in c_type:
             fig = draw_north_indian_chart(d['House_Planets'], d['Asc_Sign'])
             st.pyplot(fig)
-            st.info("ℹ️ **North Indian:** Houses fixed. Top Diamond = 1st House. Numbers = Signs.")
         else:
             fig = draw_south_indian_chart(d['Planet_Details'])
             st.pyplot(fig)
-            st.info("ℹ️ **South Indian:** Signs fixed. Aries = Top Row, 2nd Box. Clockwise.")
             
-    # 3. DASHA TAB
+        st.divider()
+        st.subheader("Chart Analysis")
+        interp = get_chart_interpretations(d['Summary']['Asc_Sign_ID'])
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown(f"**🌟 Personality:**\n{interp['Personality']}")
+            st.markdown(f"**💪 Physical:**\n{interp['Physical']}")
+            st.markdown(f"**❤️ Relationships:**\n{interp['Rel']}")
+        with c2:
+            st.markdown(f"**💼 Career:**\n{interp['Career']}")
+            st.markdown(f"**🏥 Health:**\n{interp['Health']}")
+            
+    # 3. DASHA TAB (6 Levels)
     with tab3:
-        d_system = st.radio("Dasha System:", ["Vimshottari", "Yogini"], horizontal=True)
+        d_system = st.radio("Dasha System:", ["Vimshottari", "Yogini (Coming Soon)"], horizontal=True)
         
         if "Vimshottari" in d_system:
-            st.subheader("Vimshottari Dasha Analysis")
+            st.caption("Drill Down Sequence: Mahadasha → Antar → Pratyantar → Sookshma → Prana → Deha")
+            
+            # Level 1: MD
             md_list = calculate_vimshottari_structure(d['JD'], d['BirthDate'])
             md_names = [f"{m['Lord']} ({m['Start'].year}-{m['End'].year})" for m in md_list]
-            sel_md_idx = st.selectbox("Select Mahadasha (Level 1)", range(len(md_list)), format_func=lambda x: md_names[x])
-            
+            sel_md_idx = st.selectbox("1. Mahadasha", range(len(md_list)), format_func=lambda x: md_names[x])
             sel_md = md_list[sel_md_idx]
             
-            st.markdown(f"**{sel_md['Lord']} Mahadasha**")
+            # Level 2: AD
             ad_list = get_sub_periods(sel_md['Lord'], sel_md['Start'], sel_md['FullYears'])
-            ad_names = [f"{a['Lord']} ({a['Start'].strftime('%b %Y')} - {a['End'].strftime('%b %Y')})" for a in ad_list]
+            ad_names = [f"{a['Lord']} (ends {a['End'].strftime('%Y-%m-%d')})" for a in ad_list]
+            sel_ad_idx = st.selectbox("2. Antardasha", range(len(ad_list)), format_func=lambda x: ad_names[x])
+            sel_ad = ad_list[sel_ad_idx]
             
-            c1, c2 = st.columns(2)
-            with c1:
-                st.caption("Antardasha (Level 2)")
-                st.table(pd.DataFrame([{"Lord": a['Lord'], "End": a['End'].strftime('%d-%b-%Y')} for a in ad_list]))
+            # Level 3: PD
+            pd_list = get_sub_periods(sel_ad['Lord'], sel_ad['Start'], sel_ad['Duration'])
+            pd_names = [f"{p['Lord']} (ends {p['End'].strftime('%Y-%m-%d')})" for p in pd_list]
+            sel_pd_idx = st.selectbox("3. Pratyantardasha", range(len(pd_list)), format_func=lambda x: pd_names[x])
+            sel_pd = pd_list[sel_pd_idx]
             
-            with c2:
-                sel_ad_idx = st.selectbox("Drill Down: Antardasha", range(len(ad_list)), format_func=lambda x: ad_names[x])
-                sel_ad = ad_list[sel_ad_idx]
-                pd_list = get_sub_periods(sel_ad['Lord'], sel_ad['Start'], sel_ad['Duration'])
-                st.caption(f"Pratyantardasha (Level 3) under {sel_ad['Lord']}")
-                st.dataframe(pd.DataFrame([{"Lord": p['Lord'], "Ends": p['End'].strftime('%d-%b-%Y')} for p in pd_list]), use_container_width=True)
+            # Level 4: Sookshma
+            sd_list = get_sub_periods(sel_pd['Lord'], sel_pd['Start'], sel_pd['Duration'])
+            sd_names = [f"{s['Lord']} (ends {s['End'].strftime('%d-%b')})" for s in sd_list]
+            sel_sd_idx = st.selectbox("4. Sookshma Dasha", range(len(sd_list)), format_func=lambda x: sd_names[x])
+            sel_sd = sd_list[sel_sd_idx]
+            
+            # Level 5: Prana
+            pn_list = get_sub_periods(sel_sd['Lord'], sel_sd['Start'], sel_sd['Duration'])
+            pn_names = [f"{p['Lord']} (ends {p['End'].strftime('%d-%b %H:%M')})" for p in pn_list]
+            sel_pn_idx = st.selectbox("5. Prana Dasha", range(len(pn_list)), format_func=lambda x: pn_names[x])
+            sel_pn = pn_list[sel_pn_idx]
+            
+            # Level 6: Deha (Table)
+            st.markdown(f"**6. Deha Dasha (Final Level)** under {sel_pn['Lord']} Prana")
+            dd_list = get_sub_periods(sel_pn['Lord'], sel_pn['Start'], sel_pn['Duration'])
+            
+            deha_data = [{"Lord": d['Lord'], "Ends": d['End'].strftime('%d-%b-%Y %H:%M')} for d in dd_list]
+            st.table(pd.DataFrame(deha_data))
 
         else:
-            st.info("Yogini Dasha (36 Year Cycle) - Coming Soon in next update.")
+            st.info("Yogini Dasha Logic (Coming Update)")
 
     # 4. AI PREDICTION TAB
     with tab4:

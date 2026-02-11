@@ -222,7 +222,10 @@ with st.sidebar:
     st.header("Profile")
     n_in = st.text_input("Name", "Suman Naskar")
     g_in = st.selectbox("Gender", ["Male", "Female"])
-    d_in = st.date_input("DOB", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900,1,1))
+    
+    # --- DATE FORMAT FIX HERE ---
+    d_in = st.date_input("DOB", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900,1,1), format="DD/MM/YYYY")
+    
     c1, c2 = st.columns(2)
     hr_in = c1.selectbox("Hour", range(24), index=15)
     mn_in = c2.selectbox("Min", range(60), index=45)
@@ -264,9 +267,8 @@ with st.sidebar:
 if st.session_state.current_data:
     d = st.session_state.current_data
     
-    # SAFETY: Ensure new structure exists
     if 'Summary' not in d or 'Gana' not in d['Summary']:
-        st.warning("⚠️ Applying updates. Please click 'Generate Kundali' again.")
+        st.warning("⚠️ Applying updates. Click 'Generate Kundali' again.")
         st.stop()
     
     tab1, tab2, tab3, tab4 = st.tabs(["📝 Summary", "📊 Charts", "🗓️ Dashas", "🤖 AI Prediction"])
@@ -285,7 +287,7 @@ if st.session_state.current_data:
         p_data = {p['Name']: f"{p['SignName']} ({p['Deg']:.2f}°)" for p in d['Planet_Details']}
         st.table(pd.DataFrame(p_data.items(), columns=["Planet", "Position"]))
         
-    # 2. CHARTS TAB (With Interpretations)
+    # 2. CHARTS TAB
     with tab2:
         c_type = st.selectbox("Select Chart Style:", ["North Indian (Diamond)", "South Indian (Square)"])
         

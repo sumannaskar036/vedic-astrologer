@@ -16,7 +16,7 @@ st.markdown("""
 <style>
     .header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; text-align: center; font-weight: bold; margin-bottom: 20px;}
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
-    .stExpander { border: 1px solid #333; border-radius: 5px; }
+    .stSelectbox label { font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -54,10 +54,32 @@ if 'current_data' not in st.session_state: st.session_state.current_data = None
 
 # --- 4. ASTROLOGY ENGINE ---
 
-def get_planet_positions(jd):
-    """Calculates planet positions"""
+def get_gana_yoni(nak):
+    """Restored logic for Gana and Yoni"""
+    data = {
+        "Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"),
+        "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"),
+        "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"),
+        "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"),
+        "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"),
+        "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"),
+        "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"),
+        "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"),
+        "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"),
+        "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"),
+        "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"),
+        "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"),
+        "Purva Bhadrapada": ("Manushya", "Lion"),
+        "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")
+    }
+    return data.get(nak, ("Unknown", "Unknown"))
+
+def get_planet_positions(jd, lat, lon):
+    """Calculates planet positions - NOW USES LAT/LON for correct Lagna"""
     ayanamsa = swe.get_ayanamsa_ut(jd)
-    cusps, ascmc = swe.houses(jd, 0, 0, b'P') 
+    
+    # FIX: We now pass lat/lon here to get the correct Ascendant for the specific city
+    cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
     asc_deg = (ascmc[0] - ayanamsa) % 360
     asc_sign = int(asc_deg // 30) + 1 
 
@@ -65,10 +87,7 @@ def get_planet_positions(jd):
     house_planets = {i: [] for i in range(1, 13)}
     planet_details = []
 
-    # Nakshatra List
     nak_list = ["Ashwini","Bharani","Krittika","Rohini","Mrigashira","Ardra","Punarvasu","Pushya","Ashlesha","Magha","Purva Phalguni","Uttara Phalguni","Hasta","Chitra","Swati","Vishakha","Anuradha","Jyeshtha","Mula","Purva Ashadha","Uttara Ashadha","Shravana","Dhanishta","Shatabhisha","Purva Bhadrapada","Uttara Bhadrapada","Revati"]
-    
-    # Zodiac List
     zodiac_list = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"]
 
     for pid, name in planet_map.items():
@@ -92,22 +111,26 @@ def get_planet_positions(jd):
             "Deg": deg, "House": house_num, "Nakshatra": nak_name
         })
 
-    # Add Lagna to details
     l_sign_name = zodiac_list[asc_sign-1]
-    l_nak_idx = int(asc_deg / (360/27)) % 27
-    l_nak = nak_list[l_nak_idx]
     
-    # Basic Summary Data
+    # Get Moon details for Gana/Yoni
+    moon_data = next((p for p in planet_details if p['Name']=='Moon'), None)
+    moon_sign = moon_data['SignName'] if moon_data else "Unknown"
+    moon_nak = moon_data['Nakshatra'] if moon_data else "Unknown"
+    
+    gana, yoni = get_gana_yoni(moon_nak)
+    
     summary = {
         "Lagna": l_sign_name,
-        "Lagna_Nak": l_nak,
-        "Moon_Sign": next((p['SignName'] for p in planet_details if p['Name']=='Moon'), "Unknown"),
-        "Moon_Nak": next((p['Nakshatra'] for p in planet_details if p['Name']=='Moon'), "Unknown"),
+        "Rashi": moon_sign,
+        "Nakshatra": moon_nak,
+        "Gana": gana,
+        "Yoni": yoni
     }
 
     return house_planets, asc_sign, planet_details, summary
 
-# --- CHART DRAWING FUNCTIONS ---
+# --- CHART DRAWING ---
 def draw_north_indian_chart(house_planets, asc_sign):
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.set_aspect('equal')
@@ -147,8 +170,8 @@ def draw_south_indian_chart(planet_details):
         if sign_planets[sign]: ax.text(x, y, "\n".join(sign_planets[sign]), ha='center', va='center', fontsize=8, fontweight='bold')
     return fig
 
-# --- DASHA CALCULATION ENGINE ---
-def calculate_vimshottari(jd, birth_date):
+# --- DASHA ENGINE ---
+def calculate_vimshottari_structure(jd, birth_date):
     moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
     nak_deg = (moon_pos * (27/360)) 
     nak_idx = int(nak_deg)
@@ -158,59 +181,38 @@ def calculate_vimshottari(jd, birth_date):
     years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
     
     start_lord_idx = nak_idx % 9
-    start_date = birth_date
-    
-    # Calculate Balance of first Dasha
-    first_dur = years[start_lord_idx] * balance_prop
     
     dashas = []
+    curr_date = birth_date
     
-    # 1. First Dasha (Balance)
-    end_date = start_date + datetime.timedelta(days=first_dur*365.25)
-    dashas.append({"Lord": lords[start_lord_idx], "Start": start_date, "End": end_date, "Duration": first_dur})
-    current_date = end_date
+    first_dur = years[start_lord_idx] * balance_prop
+    dashas.append({"Lord": lords[start_lord_idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=first_dur*365.25), "FullYears": years[start_lord_idx]})
+    curr_date = dashas[0]['End']
     
-    # 2. Subsequent Dashas
     for i in range(1, 9):
         idx = (start_lord_idx + i) % 9
-        lord = lords[idx]
         dur = years[idx]
-        end_date = current_date + datetime.timedelta(days=dur*365.25)
-        dashas.append({"Lord": lord, "Start": current_date, "End": end_date, "Duration": dur})
-        current_date = end_date
+        dashas.append({"Lord": lords[idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=dur*365.25), "FullYears": dur})
+        curr_date = dashas[-1]['End']
         
     return dashas
 
-def calculate_antardasha(mahadasha_lord, start_date):
-    # Standard Vimshottari Antardasha Proportions
+def get_sub_periods(lord_name, start_date, level_years):
     lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
     years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
-    
-    # Find index of Mahadasha Lord to start sub-cycle
-    try:
-        start_idx = lords.index(mahadasha_lord)
+    try: start_idx = lords.index(lord_name)
     except: return []
-
-    sub_periods = []
-    curr_date = start_date
-    
-    # Total duration of Mahadasha
-    total_md_years = years[start_idx]
-    
-    # Antardasha follows same order, starting from MD lord
+    subs = []
+    curr = start_date
     for i in range(9):
         idx = (start_idx + i) % 9
         sub_lord = lords[idx]
         sub_years = years[idx]
-        
-        # Formula: MD Years * AD Years / 120
-        ad_duration = (total_md_years * sub_years) / 120
-        end_date = curr_date + datetime.timedelta(days=ad_duration*365.25)
-        
-        sub_periods.append({"SubLord": sub_lord, "End": end_date})
-        curr_date = end_date
-        
-    return sub_periods
+        duration_years = (level_years * sub_years) / 120
+        end_date = curr + datetime.timedelta(days=duration_years*365.25)
+        subs.append({"Lord": sub_lord, "Start": curr, "End": end_date, "Duration": duration_years, "FullYears": sub_years})
+        curr = end_date
+    return subs
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
@@ -244,16 +246,16 @@ with st.sidebar:
                     elif "Raman" in ayanamsa_opt: swe.set_sid_mode(swe.SIDM_RAMAN)
                     elif "KP" in ayanamsa_opt: swe.set_sid_mode(5)
                     
-                    house_planets, asc_sign, planet_details, summary = get_planet_positions(jd)
-                    vim_dashas = calculate_vimshottari(jd, d_in)
+                    # Pass LAT/LON to get correct Lagna
+                    house_planets, asc_sign, planet_details, summary = get_planet_positions(jd, lat, lng)
                     
                     st.session_state.current_data = {
                         "Name": n_in, "Gender": g_in, 
                         "House_Planets": house_planets, "Asc_Sign": asc_sign,
                         "Planet_Details": planet_details,
                         "Summary": summary,
-                        "Vim_Dashas": vim_dashas,
-                        "Full_Chart_Text": str(planet_details) 
+                        "Full_Chart_Text": str(planet_details),
+                        "JD": jd, "BirthDate": d_in
                     }
                     st.rerun()
                 else: st.error("City not found.")
@@ -263,17 +265,24 @@ with st.sidebar:
 if st.session_state.current_data:
     d = st.session_state.current_data
     
-    # --- TAB ORDER: Summary -> Charts -> Dasha -> AI ---
+    # SAFETY: Ensure new structure exists
+    if 'Summary' not in d or 'Gana' not in d['Summary']:
+        st.warning("⚠️ Applying updates. Please click 'Generate Kundali' again.")
+        st.stop()
+    
     tab1, tab2, tab3, tab4 = st.tabs(["📝 Summary", "📊 Charts", "🗓️ Dashas", "🤖 AI Prediction"])
     
-    # 1. SUMMARY TAB
+    # 1. SUMMARY TAB (Restored Gana/Yoni)
     with tab1:
         st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4)
+        
+        # Row 1: Key Metrics
+        c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Lagna", d['Summary']['Lagna'])
-        c2.metric("Lagna Nakshatra", d['Summary']['Lagna_Nak'])
-        c3.metric("Moon Sign", d['Summary']['Moon_Sign'])
-        c4.metric("Moon Nakshatra", d['Summary']['Moon_Nak'])
+        c2.metric("Rashi", d['Summary']['Rashi'])
+        c3.metric("Nakshatra", d['Summary']['Nakshatra'])
+        c4.metric("Gana", d['Summary']['Gana'])
+        c5.metric("Yoni", d['Summary']['Yoni'])
         
         st.divider()
         st.subheader("Planetary Positions")
@@ -282,45 +291,47 @@ if st.session_state.current_data:
         
     # 2. CHARTS TAB
     with tab2:
-        c_type = st.radio("Select Chart Style:", ["North Indian (Diamond)", "South Indian (Square)"], horizontal=True)
-        
-        st.caption(f"Showing {c_type} Chart based on {d['Summary']['Lagna']} Lagna.")
+        c_type = st.selectbox("Select Chart Style:", ["North Indian (Diamond)", "South Indian (Square)"])
         
         if "North" in c_type:
             fig = draw_north_indian_chart(d['House_Planets'], d['Asc_Sign'])
             st.pyplot(fig)
-            st.info("ℹ️ **North Indian Chart:** Houses are fixed. The top diamond is always the 1st House (Lagna). The numbers represent the Zodiac Signs (1=Aries, 2=Taurus...).")
+            st.info("ℹ️ **North Indian:** Houses fixed. Top Diamond = 1st House. Numbers = Signs.")
         else:
             fig = draw_south_indian_chart(d['Planet_Details'])
             st.pyplot(fig)
-            st.info("ℹ️ **South Indian Chart:** Signs are fixed. The boxes represent Zodiac Signs starting from Aries (Top-2nd Box) moving clockwise. Lagna is marked as 'Asc' or derived from context.")
+            st.info("ℹ️ **South Indian:** Signs fixed. Aries = Top Row, 2nd Box. Clockwise.")
             
-    # 3. DASHA TAB (Drill Down)
+    # 3. DASHA TAB
     with tab3:
-        d_system = st.radio("Dasha System:", ["Vimshottari", "Yogini (Coming Soon)"], horizontal=True)
+        d_system = st.radio("Dasha System:", ["Vimshottari", "Yogini"], horizontal=True)
         
         if "Vimshottari" in d_system:
-            st.subheader("Vimshottari Mahadasha (Click to Expand)")
-            st.caption("Drill down to see Antardashas (Sub-periods)")
+            st.subheader("Vimshottari Dasha Analysis")
+            md_list = calculate_vimshottari_structure(d['JD'], d['BirthDate'])
+            md_names = [f"{m['Lord']} ({m['Start'].year}-{m['End'].year})" for m in md_list]
+            sel_md_idx = st.selectbox("Select Mahadasha (Level 1)", range(len(md_list)), format_func=lambda x: md_names[x])
             
-            for md in d['Vim_Dashas']:
-                # Label for the Expander (Mahadasha)
-                label = f"**{md['Lord']} Mahadasha** | {md['Start'].year} - {md['End'].year}"
-                
-                with st.expander(label):
-                    # Calculate Antardashas on the fly for this MD
-                    sub_periods = calculate_antardasha(md['Lord'], md['Start'])
-                    
-                    # Display as a clean list/table
-                    if sub_periods:
-                        sub_data = []
-                        for sub in sub_periods:
-                            sub_data.append({"Antardasha Lord": sub['SubLord'], "Ends On": sub['End'].strftime("%d-%b-%Y")})
-                        st.table(pd.DataFrame(sub_data))
-                    else:
-                        st.write("Calculation detail unavailable.")
+            sel_md = md_list[sel_md_idx]
+            
+            st.markdown(f"**{sel_md['Lord']} Mahadasha**")
+            ad_list = get_sub_periods(sel_md['Lord'], sel_md['Start'], sel_md['FullYears'])
+            ad_names = [f"{a['Lord']} ({a['Start'].strftime('%b %Y')} - {a['End'].strftime('%b %Y')})" for a in ad_list]
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.caption("Antardasha (Level 2)")
+                st.table(pd.DataFrame([{"Lord": a['Lord'], "End": a['End'].strftime('%d-%b-%Y')} for a in ad_list]))
+            
+            with c2:
+                sel_ad_idx = st.selectbox("Drill Down: Antardasha", range(len(ad_list)), format_func=lambda x: ad_names[x])
+                sel_ad = ad_list[sel_ad_idx]
+                pd_list = get_sub_periods(sel_ad['Lord'], sel_ad['Start'], sel_ad['Duration'])
+                st.caption(f"Pratyantardasha (Level 3) under {sel_ad['Lord']}")
+                st.dataframe(pd.DataFrame([{"Lord": p['Lord'], "Ends": p['End'].strftime('%d-%b-%Y')} for p in pd_list]), use_container_width=True)
+
         else:
-            st.warning("Yogini Dasha logic is being implemented in the next update!")
+            st.info("Yogini Dasha (36 Year Cycle) - Coming Soon in next update.")
 
     # 4. AI PREDICTION TAB
     with tab4:

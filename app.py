@@ -356,7 +356,7 @@ if st.session_state.current_data:
         p_data = {p['Name']: f"{p['SignName']} ({p['Deg']:.2f}°)" for p in d['Planet_Details']}
         st.table(pd.DataFrame(p_data.items(), columns=["Planet", "Position"]))
         
-    # 2. CHARTS TAB (With Interpretations)
+    # 2. CHARTS TAB
     with tab2:
         c_type = st.selectbox("Select Chart Style:", ["North Indian (Diamond)", "South Indian (Square)"])
         
@@ -380,49 +380,102 @@ if st.session_state.current_data:
             st.markdown(f"**💼 Career:**\n{interp['Career']}")
             st.markdown(f"**🏥 Health:**\n{interp['Health']}")
             
-    # 3. DASHA TAB (6 Levels)
+    # 3. DASHA TAB (Cascading Tables)
     with tab3:
         d_system = st.radio("Dasha System:", ["Vimshottari", "Yogini (Coming Soon)"], horizontal=True)
         
         if "Vimshottari" in d_system:
-            st.caption("Drill Down Sequence: Mahadasha → Antar → Pratyantar → Sookshma → Prana → Deha")
             
-            # Level 1: MD
+            # --- LEVEL 1: MAHADASHA ---
+            st.markdown("### 1. Mahadasha")
             md_list = calculate_vimshottari_structure(d['JD'], d['BirthDate'])
-            md_names = [f"{m['Lord']} ({m['Start'].year}-{m['End'].year})" for m in md_list]
-            sel_md_idx = st.selectbox("1. Mahadasha", range(len(md_list)), format_func=lambda x: md_names[x])
+            
+            # Display MD Table
+            md_data = []
+            for m in md_list:
+                md_data.append({"Lord": m['Lord'], "Start": m['Start'].strftime('%d-%b-%Y'), "End": m['End'].strftime('%d-%b-%Y'), "Duration": f"{m['FullYears']} Years"})
+            st.table(pd.DataFrame(md_data))
+            
+            # Selector for Level 2
+            md_options = [f"{m['Lord']} ({m['Start'].strftime('%Y')}-{m['End'].strftime('%Y')})" for m in md_list]
+            sel_md_idx = st.selectbox("Select Mahadasha to view Antardashas:", range(len(md_list)), format_func=lambda x: md_options[x])
             sel_md = md_list[sel_md_idx]
             
-            # Level 2: AD
+            st.divider()
+            
+            # --- LEVEL 2: ANTARDASHA ---
+            st.markdown(f"### 2. Antardasha (under {sel_md['Lord']})")
             ad_list = get_sub_periods(sel_md['Lord'], sel_md['Start'], sel_md['FullYears'])
-            ad_names = [f"{a['Lord']} (ends {a['End'].strftime('%Y-%m-%d')})" for a in ad_list]
-            sel_ad_idx = st.selectbox("2. Antardasha", range(len(ad_list)), format_func=lambda x: ad_names[x])
+            
+            # Display AD Table
+            ad_data = []
+            for a in ad_list:
+                ad_data.append({"Lord": a['Lord'], "Start": a['Start'].strftime('%d-%b-%Y'), "End": a['End'].strftime('%d-%b-%Y')})
+            st.table(pd.DataFrame(ad_data))
+            
+            # Selector for Level 3
+            ad_options = [f"{a['Lord']} (ends {a['End'].strftime('%d-%b-%Y')})" for a in ad_list]
+            sel_ad_idx = st.selectbox("Select Antardasha to view Pratyantardashas:", range(len(ad_list)), format_func=lambda x: ad_options[x])
             sel_ad = ad_list[sel_ad_idx]
             
-            # Level 3: PD
+            st.divider()
+            
+            # --- LEVEL 3: PRATYANTARDASHA ---
+            st.markdown(f"### 3. Pratyantardasha (under {sel_ad['Lord']})")
             pd_list = get_sub_periods(sel_ad['Lord'], sel_ad['Start'], sel_ad['Duration'])
-            pd_names = [f"{p['Lord']} (ends {p['End'].strftime('%Y-%m-%d')})" for p in pd_list]
-            sel_pd_idx = st.selectbox("3. Pratyantardasha", range(len(pd_list)), format_func=lambda x: pd_names[x])
+            
+            pd_data = []
+            for p in pd_list:
+                pd_data.append({"Lord": p['Lord'], "Start": p['Start'].strftime('%d-%b-%Y'), "End": p['End'].strftime('%d-%b-%Y')})
+            st.table(pd.DataFrame(pd_data))
+            
+            # Selector for Level 4
+            pd_options = [f"{p['Lord']} (ends {p['End'].strftime('%d-%b-%Y')})" for p in pd_list]
+            sel_pd_idx = st.selectbox("Select Pratyantardasha to view Sookshma:", range(len(pd_list)), format_func=lambda x: pd_options[x])
             sel_pd = pd_list[sel_pd_idx]
             
-            # Level 4: Sookshma
+            st.divider()
+
+            # --- LEVEL 4: SOOKSHMA ---
+            st.markdown(f"### 4. Sookshma Dasha (under {sel_pd['Lord']})")
             sd_list = get_sub_periods(sel_pd['Lord'], sel_pd['Start'], sel_pd['Duration'])
-            sd_names = [f"{s['Lord']} (ends {s['End'].strftime('%d-%b')})" for s in sd_list]
-            sel_sd_idx = st.selectbox("4. Sookshma Dasha", range(len(sd_list)), format_func=lambda x: sd_names[x])
+            
+            sd_data = []
+            for s in sd_list:
+                sd_data.append({"Lord": s['Lord'], "Start": s['Start'].strftime('%d-%b-%Y'), "End": s['End'].strftime('%d-%b-%Y')})
+            st.table(pd.DataFrame(sd_data))
+            
+            # Selector for Level 5
+            sd_options = [f"{s['Lord']} (ends {s['End'].strftime('%d-%b')})" for s in sd_list]
+            sel_sd_idx = st.selectbox("Select Sookshma to view Prana:", range(len(sd_list)), format_func=lambda x: sd_options[x])
             sel_sd = sd_list[sel_sd_idx]
             
-            # Level 5: Prana
+            st.divider()
+
+            # --- LEVEL 5: PRANA ---
+            st.markdown(f"### 5. Prana Dasha (under {sel_sd['Lord']})")
             pn_list = get_sub_periods(sel_sd['Lord'], sel_sd['Start'], sel_sd['Duration'])
-            pn_names = [f"{p['Lord']} (ends {p['End'].strftime('%d-%b %H:%M')})" for p in pn_list]
-            sel_pn_idx = st.selectbox("5. Prana Dasha", range(len(pn_list)), format_func=lambda x: pn_names[x])
-            sel_pn = pn_list[sel_pn_idx]
             
-            # Level 6: Deha (Table)
-            st.markdown(f"**6. Deha Dasha (Final Level)** under {sel_pn['Lord']} Prana")
+            pn_data = []
+            for p in pn_list:
+                pn_data.append({"Lord": p['Lord'], "Start": p['Start'].strftime('%d-%b %H:%M'), "End": p['End'].strftime('%d-%b %H:%M')})
+            st.table(pd.DataFrame(pn_data))
+            
+            # Selector for Level 6
+            pn_options = [f"{p['Lord']} (ends {p['End'].strftime('%d-%b %H:%M')})" for p in pn_list]
+            sel_pn_idx = st.selectbox("Select Prana to view Deha:", range(len(pn_list)), format_func=lambda x: pn_options[x])
+            sel_pn = pn_list[sel_pn_idx]
+
+            st.divider()
+
+            # --- LEVEL 6: DEHA ---
+            st.markdown(f"### 6. Deha Dasha (under {sel_pn['Lord']})")
             dd_list = get_sub_periods(sel_pn['Lord'], sel_pn['Start'], sel_pn['Duration'])
             
-            deha_data = [{"Lord": d['Lord'], "Ends": d['End'].strftime('%d-%b-%Y %H:%M')} for d in dd_list]
-            st.table(pd.DataFrame(deha_data))
+            dd_data = []
+            for d_item in dd_list:
+                dd_data.append({"Lord": d_item['Lord'], "Start": d_item['Start'].strftime('%d-%b %H:%M'), "End": d_item['End'].strftime('%d-%b %H:%M')})
+            st.table(pd.DataFrame(dd_data))
 
         else:
             st.info("Yogini Dasha Logic (Coming Update)")
@@ -445,9 +498,7 @@ if st.session_state.current_data:
                 response = model.generate_content(prompt)
                 st.info(response.text)
             except Exception as e:
-                # Log for dev
                 print(f"API Error: {e}")
-                # Message for user
                 st.warning("✨ The cosmic channels are momentarily quiet. Please try again in a few moments. 🙏")
 
 else:

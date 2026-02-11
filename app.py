@@ -17,9 +17,6 @@ st.markdown("""
     .header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; text-align: center; font-weight: bold; margin-bottom: 20px;}
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
     .stSelectbox label { font-weight: bold; }
-    .interp-box { background-color: #0e1117; border: 1px solid #333; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
-    h3 { font-size: 1.2rem; font-weight: 600; margin-top: 1rem; }
-    .status-guide { font-size: 0.9rem; color: #cccccc; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -53,15 +50,15 @@ except: pass
 
 # --- 3. TRANSLATION ENGINE ---
 TRANSLATIONS = {
-    "English": {"title": "TaraVaani", "gen_btn": "Generate Kundali", "tab_summary": "📝 Summary", "tab_charts": "🔮 Kundalis", "tab_kp": "⭐ KP System", "tab_dashas": "🗓️ Dashas", "tab_ai": "🤖 AI Prediction", "asc": "Ascendant", "mangalik_yes": "Yes (Mangalik)", "mangalik_no": "No"},
-    "Hindi": {"title": "तारावाणी", "gen_btn": "कुंडली बनाएं", "tab_summary": "📝 सारांश", "tab_charts": "🔮 कुंडली", "tab_kp": "⭐ के.पी.", "tab_dashas": "🗓️ दशा", "tab_ai": "🤖 भविष्यफल", "asc": "लग्न", "mangalik_yes": "हाँ (मांगलिक)", "mangalik_no": "नहीं"},
-    "Bengali": {"title": "তারাবাণী", "gen_btn": "কোষ্ঠী তৈরি করুন", "tab_summary": "📝 সারাংশ", "tab_charts": "🔮 কুষ্ঠি", "tab_kp": "⭐ কে.পি.", "tab_dashas": "🗓️ দশা", "tab_ai": "🤖 ভবিষ্যৎবাণী", "asc": "লগ্ন", "mangalik_yes": "হ্যাঁ (মাঙ্গলিক)", "mangalik_no": "না"},
-    "Marathi": {"title": "तारावाणी", "gen_btn": "कुंडली बनवा", "tab_summary": "📝 सारांश", "tab_charts": "🔮 कुंडली", "tab_kp": "⭐ के.पी.", "tab_dashas": "🗓️ दशा", "tab_ai": "🤖 भविष्य", "asc": "लग्न", "mangalik_yes": "हो (मांगलिक)", "mangalik_no": "नाही"},
-    "Tamil": {"title": "தாரா வாணி", "gen_btn": "ஜாதகம் கணி", "tab_summary": "📝 சுருக்கம்", "tab_charts": "🔮 கட்டம்", "tab_kp": "⭐ கே.பி.", "tab_dashas": "🗓️ தசை", "tab_ai": "🤖 கணிப்பு", "asc": "லக்னம்", "mangalik_yes": "ஆம் (செவ்வாய் தோஷம்)", "mangalik_no": "இல்லை"},
-    "Telugu": {"title": "తారావాణి", "gen_btn": "జాతకం పొందండి", "tab_summary": "📝 సారాంశం", "tab_charts": "🔮 చక్రం", "tab_kp": "⭐ కే.పీ.", "tab_dashas": "🗓️ దశ", "tab_ai": "🤖 జ్యోతిష్యం", "asc": "లగ్నం", "mangalik_yes": "అవును (కుజ దోషం)", "mangalik_no": "కాదు"},
-    "Kannada": {"title": "ತಾರಾವಾಣಿ", "gen_btn": "ಜಾತಕ ನೋಡಿ", "tab_summary": "📝 ಸಾರಾಂಶ", "tab_charts": "🔮 ಕುಂಡಲಿ", "tab_kp": "⭐ ಕೆ.ಪಿ.", "tab_dashas": "🗓️ ದಶೆ", "tab_ai": "🤖 ಭವಿಷ್ಯ", "asc": "ಲಗ್ನ", "mangalik_yes": "ಹೌದು (ಕುಜ ದೋಷ)", "mangalik_no": "ಇಲ್ಲ"},
-    "Gujarati": {"title": "તારાવાણી", "gen_btn": "કુંડળી બનાવો", "tab_summary": "📝 સારાંશ", "tab_charts": "🔮 કુંડળી", "tab_kp": "⭐ કે.પી.", "tab_dashas": "🗓️ દશા", "tab_ai": "🤖 ભવિષ્યવાણી", "asc": "લગ્ન", "mangalik_yes": "હા (માંગલિક)", "mangalik_no": "ના"},
-    "Malayalam": {"title": "താരാവാണി", "gen_btn": "ജാതകം", "tab_summary": "📝 സംഗ്രഹം", "tab_charts": "🔮 കുണ്ഡലി", "tab_kp": "⭐ കെ.പി.", "tab_dashas": "🗓️ ദശ", "tab_ai": "🤖 പ്രവചനം", "asc": "ലഗ്നം", "mangalik_yes": "അതെ (ചൊവ്വാ ദോഷം)", "mangalik_no": "അല്ല"}
+    "English": {"title": "TaraVaani", "gen_btn": "Generate Kundali", "tab_summary": "📝 Summary", "tab_charts": "🔮 Kundalis", "tab_kp": "⭐ KP System", "tab_dashas": "🗓️ Dashas", "tab_ai": "🤖 AI Prediction", "asc": "Ascendant", "mangalik_yes": "Yes (Mangalik)", "mangalik_no": "No", "bhav_chart": "Bhav Chalit Chart"},
+    "Hindi": {"title": "तारावाणी", "gen_btn": "कुंडली बनाएं", "tab_summary": "📝 सारांश", "tab_charts": "🔮 कुंडली", "tab_kp": "⭐ के.पी.", "tab_dashas": "🗓️ दशा", "tab_ai": "🤖 भविष्यफल", "asc": "लग्न", "mangalik_yes": "हाँ (मांगलिक)", "mangalik_no": "नहीं", "bhav_chart": "भाव चलित कुंडली"},
+    "Bengali": {"title": "তারাবাণী", "gen_btn": "কোষ্ঠী তৈরি করুন", "tab_summary": "📝 সারাংশ", "tab_charts": "🔮 কুষ্ঠি", "tab_kp": "⭐ কে.পি.", "tab_dashas": "🗓️ দশা", "tab_ai": "🤖 ভবিষ্যৎবাণী", "asc": "লগ্ন", "mangalik_yes": "হ্যাঁ (মাঙ্গলিক)", "mangalik_no": "না", "bhav_chart": "ভাব চলিত কুষ্ঠি"},
+    "Marathi": {"title": "तारावाणी", "gen_btn": "कुंडली बनवा", "tab_summary": "📝 सारांश", "tab_charts": "🔮 कुंडली", "tab_kp": "⭐ के.पी.", "tab_dashas": "🗓️ दशा", "tab_ai": "🤖 भविष्य", "asc": "लग्न", "mangalik_yes": "हो (मांगलिक)", "mangalik_no": "नाही", "bhav_chart": "भाव चलित कुंडली"},
+    "Tamil": {"title": "தாரா வாணி", "gen_btn": "ஜாதகம் கணி", "tab_summary": "📝 சுருக்கம்", "tab_charts": "🔮 கட்டம்", "tab_kp": "⭐ கே.பி.", "tab_dashas": "🗓️ தசை", "tab_ai": "🤖 கணிப்பு", "asc": "லக்னம்", "mangalik_yes": "ஆம் (செவ்வாய் தோஷம்)", "mangalik_no": "இல்லை", "bhav_chart": "பாவ சலித சார்ட்"},
+    "Telugu": {"title": "తారావాణి", "gen_btn": "జాతకం పొందండి", "tab_summary": "📝 సారాంశం", "tab_charts": "🔮 చక్రం", "tab_kp": "⭐ కే.పీ.", "tab_dashas": "🗓️ దశ", "tab_ai": "🤖 జ్యోతిష్యం", "asc": "లగ్నం", "mangalik_yes": "అవును (కుజ దోషం)", "mangalik_no": "కాదు", "bhav_chart": "భావ చలిత చక్రం"},
+    "Kannada": {"title": "ತಾರಾವಾಣಿ", "gen_btn": "ಜಾತಕ ನೋಡಿ", "tab_summary": "📝 ಸಾರಾಂಶ", "tab_charts": "🔮 ಕುಂಡಲಿ", "tab_kp": "⭐ ಕೆ.ಪಿ.", "tab_dashas": "🗓️ ದಶೆ", "tab_ai": "🤖 ಭವಿಷ್ಯ", "asc": "ಲಗ್ನ", "mangalik_yes": "ಹೌದು (ಕುಜ ದೋಷ)", "mangalik_no": "ಇಲ್ಲ", "bhav_chart": "ಭಾವ ಚಲಿತ ಕುಂಡಲಿ"},
+    "Gujarati": {"title": "તારાવાણી", "gen_btn": "કુંડળી બનાવો", "tab_summary": "📝 સારાંશ", "tab_charts": "🔮 કુંડળી", "tab_kp": "⭐ કે.પી.", "tab_dashas": "🗓️ દશા", "tab_ai": "🤖 ભવિષ્યવાણી", "asc": "લગ્ન", "mangalik_yes": "હા (માંગલિક)", "mangalik_no": "ના", "bhav_chart": "ભાવ ચલિત કુંડળી"},
+    "Malayalam": {"title": "താരാവാണി", "gen_btn": "ജാതകം", "tab_summary": "📝 സംഗ്രഹം", "tab_charts": "🔮 കുണ്ഡലി", "tab_kp": "⭐ കെ.പി.", "tab_dashas": "🗓️ ദശ", "tab_ai": "🤖 പ്രവചനം", "asc": "ലഗ്നം", "mangalik_yes": "അതെ (ചൊവ്വാ ദോഷം)", "mangalik_no": "അല്ല", "bhav_chart": "ഭാവ ചലിത കുണ്ഡലി"}
 }
 
 def txt(key, lang):
@@ -83,17 +80,14 @@ def get_kp_lords(deg):
     sign_idx = int(deg / 30)
     sign_lord = zodiac_lords[sign_idx % 12]
     
-    nak_span = 13 + (20/60) # 13.333
+    nak_span = 13 + (20/60) 
     nak_idx_total = int(deg / nak_span)
     star_lord_idx = nak_idx_total % 9
     star_lord = lords[star_lord_idx]
     
-    # Sub Lord Calculation
     deg_in_nak = deg - (nak_idx_total * nak_span)
     min_in_nak = deg_in_nak * 60
     
-    # KP Sub Lords divide the star based on Vimshottari years * 800 mins / 120
-    # Order starts from the Star Lord itself
     curr_sub = star_lord_idx
     acc_min = 0
     sub_lord = lords[curr_sub]
@@ -121,7 +115,7 @@ def get_nakshatra_properties(nak_name, rashi_name):
     lord = lords.get(rashi_name, "Unknown")
     return {"Varna": varna, "Vashya": vashya, "Yoni": yoni, "Gana": gana, "Nadi": nadi, "SignLord": lord}
 
-def calculate_panchang(jd, lat, lon, birth_dt):
+def calculate_panchang(jd, lat, lon, birth_dt, moon_pos):
     try:
         res = swe.rise_trans(jd - 1, 0, 0, lat, lon, 0)
         sunrise = swe.jdut1_to_utc(res[1][0], 1)
@@ -129,8 +123,10 @@ def calculate_panchang(jd, lat, lon, birth_dt):
         sr_time = f"{int(sunrise[3]):02d}:{int(sunrise[4]):02d}:{int(sunrise[5]):02d}"
         ss_time = f"{int(sunset[3]):02d}:{int(sunset[4]):02d}:{int(sunset[5]):02d}"
     except: sr_time, ss_time = "Unknown", "Unknown"
+    
     sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
-    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
+    # Reuse moon_pos passed from parent function to be efficient
+    
     diff = (moon_pos - sun_pos) % 360
     tithi_num = int(diff / 12) + 1
     paksha = "Shukla" if tithi_num <= 15 else "Krishna"
@@ -196,6 +192,7 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
     sign_lords = ["Mars","Venus","Mercury","Moon","Sun","Mercury","Venus","Mars","Jupiter","Saturn","Saturn","Jupiter"]
 
     mars_house = 0
+    moon_pos_val = 0.0
 
     # 1. PLANETS CALC
     for pid, code in planet_map.items():
@@ -207,6 +204,8 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
             calc = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)
             pos = calc[0][0]
             speed = calc[0][3]
+            
+        if code == "moon": moon_pos_val = pos
             
         sign = int(pos // 30) + 1 
         deg = pos % 30
@@ -234,14 +233,12 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
         # KP Lords
         kp_sign, kp_star, kp_sub = get_kp_lords(pos)
         
-        # Standard Details
         planet_details.append({
             "Planet": p_name_local, "Sign": sign_name, "Sign Lord": sign_lord, 
             "Nakshatra": nak_name, "Naksh Lord": nak_lord, "Degree": f"{int(deg)}°{int((deg%1)*60)}'",
             "Retro": is_retro, "House": house_d1, "Status": status_display
         })
         
-        # KP Details (Planet Table)
         planet_details_kp.append({
             "Planet": p_name_local, "Degree": f"{int(deg)}°{int((deg%1)*60)}'",
             "Sign": sign_name, "Sign Lord": kp_sign, "Star Lord": kp_star, "Sub Lord": kp_sub
@@ -249,6 +246,7 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
 
     l_sign_name = zodiac_list[asc_sign-1]
     
+    # Ascendant Row
     planet_details.insert(0, {
         "Planet": txt("asc", lang), "Sign": l_sign_name, "Sign Lord": sign_lords[asc_sign-1],
         "Nakshatra": nak_list[int(asc_deg/(360/27)%27)], "Naksh Lord": nak_lords[int(asc_deg/(360/27)%27)],
@@ -263,14 +261,14 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
     })
 
     # 2. CUSPS CALC (KP)
-    # swe.houses returns (cusps, ascmc). Cusps is tuple of 13 floats. Index 1 is House 1.
-    cusps_deg = cusps # Already calc at top
-    house_planets_chalit = {i: [] for i in range(1, 13)} # For Bhav Chalit Chart
+    cusps_deg = cusps
     
-    for i in range(1, 13):
+    # Safe Loop for Cusps (Handle tuple range safety)
+    for i in range(1, len(cusps_deg)): 
+        if i > 12: break # Safety break
         c_deg = cusps_deg[i]
         c_sign_idx = int(c_deg // 30)
-        c_sign_name = zodiac_list[c_sign_idx]
+        c_sign_name = zodiac_list[c_sign_idx % 12]
         c_deg_in_sign = c_deg % 30
         
         c_s_lord, c_st_lord, c_sb_lord = get_kp_lords(c_deg)
@@ -280,33 +278,23 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
             "Sign": c_sign_name, "Sign Lord": c_s_lord, "Star Lord": c_st_lord, "Sub Lord": c_sb_lord
         })
     
-    # 3. BHAV CHALIT PLANET MAPPING
-    # Logic: Planet is in House X if Cusp X <= Planet Longitude < Cusp X+1
-    # Simple approximations for now as exact calculation requires handling 360/0 crossover
-    for p_kp in planet_details_kp:
-        # We need raw longitude to map to Bhav Chalit. Re-fetching roughly or storing earlier is better.
-        # Simplification: Use the House from D1 for visual, but KP table shows true accuracy.
-        # Actually, let's just create a mock "Bhav Chalit" which visually looks like D1 but labeled Bhav.
-        # True Bhav Chalit drawing needs exact logic.
-        pass
-
-    # 4. RULING PLANETS (Current Day)
-    day_lords = ["Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Sun"] # Mon-Sun
+    # 4. RULING PLANETS
+    day_lords = ["Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Sun"] 
     day_lord = day_lords[birth_dt.weekday()]
     
+    # Use pre-calculated moon_pos_val
+    moon_s, moon_st, moon_sb = get_kp_lords(moon_pos_val)
+    
     ruling_planets = [
-        {"Planet": "Moon", "Sign Lord": get_kp_lords(swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0])[0], 
-         "Star Lord": get_kp_lords(swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0])[1], 
-         "Sub Lord": get_kp_lords(swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0])[2]},
+        {"Planet": "Moon", "Sign Lord": moon_s, "Star Lord": moon_st, "Sub Lord": moon_sb},
         {"Planet": "Ascendant", "Sign Lord": kp_asc_sign, "Star Lord": kp_asc_star, "Sub Lord": kp_asc_sub},
         {"Planet": "Day Lord", "Sign Lord": day_lord, "Star Lord": "-", "Sub Lord": "-"}
     ]
 
     is_mangalik = txt("mangalik_yes", lang) if mars_house in [1, 4, 7, 8, 12] else txt("mangalik_no", lang)
     
-    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-    moon_sign_idx = int(moon_pos // 30)
-    moon_nak_idx = int(moon_pos / (360/27)) % 27
+    moon_sign_idx = int(moon_pos_val // 30)
+    moon_nak_idx = int(moon_pos_val / (360/27)) % 27
     
     summary = {
         "Lagna": l_sign_name,
@@ -314,7 +302,7 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
         "Nakshatra": nak_list[moon_nak_idx],
         "Charan": 1, 
         "Mangalik": is_mangalik,
-        **calculate_panchang(jd, lat, lon, birth_dt),
+        **calculate_panchang(jd, lat, lon, birth_dt, moon_pos_val),
         **get_nakshatra_properties(nak_list[moon_nak_idx], zodiac_list[moon_sign_idx]),
         "Asc_Sign_ID": asc_sign 
     }
@@ -428,7 +416,7 @@ with st.sidebar:
                     elif "Raman" in ayanamsa_opt: swe.set_sid_mode(swe.SIDM_RAMAN)
                     elif "KP" in ayanamsa_opt: swe.set_sid_mode(5)
                     
-                    # Core Calculation
+                    # Pass Language
                     hp_d1, hp_d9, asc_s, asc_n, p_dets, p_dets_kp, c_dets_kp, r_planets, summ = get_planet_positions(jd, lat, lng, birth_dt, lang_opt)
                     
                     st.session_state.current_data = {
@@ -503,10 +491,8 @@ if st.session_state.current_data:
     with tab3:
         st.markdown("### Krishnamurti Paddhati (KP)")
         
-        # Bhav Chalit Chart (Reusing visualizer with D1 Planets for illustration as requested)
-        # Note: True Bhav Chalit places planets by Cusp degree. This is visual placement.
-        st.caption("Bhav Chalit Chart")
-        fig_kp = draw_chart(d['House_Planets_D1'], d['Asc_Sign_D1'], "North", "Bhav Chalit Chart")
+        st.caption(txt("bhav_chart", lang_opt))
+        fig_kp = draw_chart(d['House_Planets_D1'], d['Asc_Sign_D1'], "North", txt("bhav_chart", lang_opt))
         st.pyplot(fig_kp)
         
         st.divider()
@@ -520,8 +506,6 @@ if st.session_state.current_data:
         with c2:
             st.subheader("KP Cusps (House Beginnings)")
             st.dataframe(pd.DataFrame(d['Cusp_Details_KP']), use_container_width=True, hide_index=True)
-            
-        st.info("ℹ️ **Cusp:** The exact degree where a House begins. The Sub-Lord of the Cusp determines the result of that House.")
 
     # 4. DASHA TAB
     with tab4:

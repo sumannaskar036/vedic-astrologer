@@ -5,7 +5,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
 import requests
-from openai import OpenAI   # ✅ ADDED (only new import)
+import google.generativeai as genai  # ✅ ADDED GEMINI IMPORT
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
@@ -56,6 +56,12 @@ try:
     geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
 except Exception:
     geocoder = None
+
+# ✅ CONFIGURE GEMINI HERE
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except Exception as e:
+    st.error(f"Gemini Key Error: {e}")
 
 # --- 4. SESSION STATE ---
 if 'user_id' not in st.session_state:
@@ -158,12 +164,12 @@ with st.sidebar:
     n_in = st.text_input("Full Name", "")
     g_in = st.selectbox("Gender", ["Male","Female"])
     d_in = st.date_input(
-    "Date of Birth",
-    value=None,
-    min_value=datetime.date(1900, 1, 1),
-    max_value=datetime.date.today(),
-    format="DD/MM/YYYY"
-)
+        "Date of Birth",
+        value=None,
+        min_value=datetime.date(1900, 1, 1),
+        max_value=datetime.date.today(),
+        format="DD/MM/YYYY"
+    )
     c1, c2 = st.columns(2)
     with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=0, help="Birth hour")
     with c2: mn_in = st.selectbox("Minute", range(60), index=0, help="Birth minute")
@@ -230,20 +236,20 @@ Question: Predict about {q_topic}.
 IMPORTANT: Write response in {lang_opt} language.
 Style: Mystic, positive, clear. Use bullet points.
 """
-
-        # ✅ GPT-4o-mini (Gemini fully removed)
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
-        )
-
-        st.info(response.choices[0].message.content)
+        
+        # ✅ GEMINI 1.5 FLASH BLOCK (Replaces OpenAI)
+        try:
+            # We use the standard model name. 
+            # If 404 occurs, update requirements.txt to google-generativeai>=0.7.0
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(prompt)
+            st.info(response.text)
+            
+        except Exception as e:
+            st.error(f"AI Error: {e}")
+            if "404" in str(e):
+                st.warning("Hint: If you see a 404 error, ensure your requirements.txt has 'google-generativeai>=0.7.0'")
 
 else:
     st.title("☸️ TaraVaani")
     st.info("👈 Please enter birth details in the sidebar to begin.")
-
-

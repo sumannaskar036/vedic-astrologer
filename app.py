@@ -125,7 +125,6 @@ def calculate_panchang(jd, lat, lon, birth_dt, moon_pos):
     except: sr_time, ss_time = "Unknown", "Unknown"
     
     sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
-    # Reuse moon_pos passed from parent function to be efficient
     
     diff = (moon_pos - sun_pos) % 360
     tithi_num = int(diff / 12) + 1
@@ -416,7 +415,7 @@ with st.sidebar:
                     elif "Raman" in ayanamsa_opt: swe.set_sid_mode(swe.SIDM_RAMAN)
                     elif "KP" in ayanamsa_opt: swe.set_sid_mode(5)
                     
-                    # Pass Language
+                    # Core Calculation
                     hp_d1, hp_d9, asc_s, asc_n, p_dets, p_dets_kp, c_dets_kp, r_planets, summ = get_planet_positions(jd, lat, lng, birth_dt, lang_opt)
                     
                     st.session_state.current_data = {
@@ -492,8 +491,11 @@ if st.session_state.current_data:
         st.markdown("### Krishnamurti Paddhati (KP)")
         
         st.caption(txt("bhav_chart", lang_opt))
-        fig_kp = draw_chart(d['House_Planets_D1'], d['Asc_Sign_D1'], "North", txt("bhav_chart", lang_opt))
-        st.pyplot(fig_kp)
+        # WRAP CHART IN COLUMNS TO MAKE IT SMALLER
+        c_kp1, c_kp2 = st.columns(2)
+        with c_kp1:
+            fig_kp = draw_chart(d['House_Planets_D1'], d['Asc_Sign_D1'], "North", txt("bhav_chart", lang_opt))
+            st.pyplot(fig_kp)
         
         st.divider()
         st.subheader("Ruling Planets")

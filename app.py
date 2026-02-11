@@ -54,7 +54,6 @@ except: pass
 # --- 3. TRANSLATION ENGINE ---
 TRANSLATIONS = {
     "English": {"title": "TaraVaani", "gen_btn": "Generate Kundali", "tab_summary": "📝 Summary", "tab_kundalis": "🔮 Kundalis", "tab_kp": "⭐ KP System", "tab_charts": "📊 All Charts", "tab_dashas": "🗓️ Dashas", "tab_ai": "🤖 AI Prediction", "asc": "Ascendant", "mangalik_yes": "Yes (Mangalik)", "mangalik_no": "No", "bhav_chart": "Bhav Chalit Chart"},
-    # Fallback to English for UI stability
 }
 
 def txt(key, lang):
@@ -182,6 +181,70 @@ def calculate_panchang(jd, lat, lon, birth_dt, moon_pos):
     ayanamsa = swe.get_ayanamsa_ut(jd)
     return {"Sunrise": sr_time, "Sunset": ss_time, "Tithi": tithi_name, "Yoga": yoga_name, "Karan": karan_name, "Ayanamsa": f"{ayanamsa:.2f}°"}
 
+def get_navamsa_pos(deg):
+    abs_deg = deg 
+    sign_idx = int(abs_deg / 30) 
+    deg_in_sign = abs_deg % 30
+    nav_num = int(deg_in_sign / (30/9)) 
+    moveable, fixed, dual = [0, 4, 8], [1, 5, 9], [2, 6, 10]
+    if sign_idx in moveable: base = 0
+    elif sign_idx in fixed: base = 9
+    elif sign_idx in dual: base = 6
+    else: base = 3
+    nav_sign_idx = (base + nav_num) % 12
+    return nav_sign_idx + 1
+
+# --- THIS WAS THE MISSING FUNCTION CAUSING ERROR ---
+def get_planet_status(planet, sign_name):
+    # Standardize to Title Case for safety
+    planet = planet.title()
+    sign_name = sign_name.title()
+    
+    sign_map = {"Aries":1, "Taurus":2, "Gemini":3, "Cancer":4, "Leo":5, "Virgo":6, "Libra":7, "Scorpio":8, "Sagittarius":9, "Capricorn":10, "Aquarius":11, "Pisces":12}
+    s_id = sign_map.get(sign_name, 0)
+    
+    if planet in ["Ascendant", "Uranus", "Neptune", "Pluto", "Rahu", "Ketu"]: return "--"
+    
+    own = {"Sun":[5], "Moon":[4], "Mars":[1,8], "Mercury":[3,6], "Jupiter":[9,12], "Venus":[2,7], "Saturn":[10,11]}
+    exalted = {"Sun":1, "Moon":2, "Mars":10, "Mercury":6, "Jupiter":4, "Venus":12, "Saturn":7}
+    debilitated = {"Sun":7, "Moon":8, "Mars":4, "Mercury":12, "Jupiter":10, "Venus":6, "Saturn":1}
+    friends = {"Sun":[4,1,8,9,12], "Moon":[5,3,6], "Mars":[5,4,9,12], "Mercury":[5,2,7], "Jupiter":[5,4,1,8], "Venus":[3,6,10,11], "Saturn":[3,6,2,7]}
+    enemies = {"Sun":[2,7,10,11], "Moon":[], "Mars":[3,6], "Mercury":[4], "Jupiter":[3,6,2,7], "Venus":[5,4], "Saturn":[5,4,1,8]}
+    
+    if s_id in own.get(planet, []): return "Own Sign"
+    if exalted.get(planet) == s_id: return "Exalted"
+    if debilitated.get(planet) == s_id: return "Debilitated"
+    if s_id in friends.get(planet, []): return "Friendly"
+    if s_id in enemies.get(planet, []): return "Enemy"
+    return "Neutral"
+
+# --- DETAILED INTERPRETATIONS ---
+def get_detailed_interpretations(asc_sign_name):
+    """Returns detailed text for Summary Tab based on Ascendant"""
+    data = {
+        "Aries": {
+            "Gen": "As an Aries Ascendant, you are born under the sign of the Ram, ruled by Mars. This placement bestows upon you a dynamic, energetic, and pioneering spirit. You are a natural initiator who loves to start new projects.",
+            "Pers": "You possess a strong will and a direct approach to life. You are courageous, confident, and enthusiastic. However, you can also be impulsive and impatient. You value independence highly and often prefer to lead rather than follow.",
+            "Phys": "Physically, you tend to have a strong, athletic build with prominent features, often a distinct nose or eyebrows. You likely walk quickly and have an intense gaze. High energy levels are a hallmark of your constitution.",
+            "Health": "You are prone to issues related to the head, such as migraines, headaches, or fevers. Stress management is crucial for you. Regular exercise is not just good for your body but essential for venting your excess mental energy.",
+            "Career": "You thrive in competitive environments. Careers in the military, police, sports, engineering, or entrepreneurship suit you well. You need a role that offers autonomy and challenges rather than routine desk work.",
+            "Rel": "In relationships, you are passionate and direct. You enjoy the chase and are often the one to initiate interest. You need a partner who can match your energy but also has the patience to handle your occasional outbursts."
+        },
+        # (Default text for other signs to prevent crashes - Ideally expand this list)
+        "Taurus": {"Gen": "Ruled by Venus, stable and practical.", "Pers": "Patient and reliable.", "Phys": "Strong build.", "Health": "Throat issues.", "Career": "Finance/Arts.", "Rel": "Loyal."},
+        "Gemini": {"Gen": "Ruled by Mercury, intellectual.", "Pers": "Witty and adaptable.", "Phys": "Slender.", "Health": "Nervous system.", "Career": "Media.", "Rel": "Fun-loving."},
+        "Cancer": {"Gen": "Ruled by Moon, emotional.", "Pers": "Nurturing.", "Phys": "Soft features.", "Health": "Stomach.", "Career": "Caregiving.", "Rel": "Devoted."},
+        "Leo": {"Gen": "Ruled by Sun, regal.", "Pers": "Proud and generous.", "Phys": "Broad shoulders.", "Health": "Heart.", "Career": "Leadership.", "Rel": "Passionate."},
+        "Virgo": {"Gen": "Ruled by Mercury, analytical.", "Pers": "Perfectionist.", "Phys": "Neat.", "Health": "Digestion.", "Career": "Service.", "Rel": "Practical."},
+        "Libra": {"Gen": "Ruled by Venus, balanced.", "Pers": "Diplomatic.", "Phys": "Attractive.", "Health": "Kidneys.", "Career": "Law/Arts.", "Rel": "Romantic."},
+        "Scorpio": {"Gen": "Ruled by Mars, intense.", "Pers": "Secretive.", "Phys": "Piercing eyes.", "Health": "Reproductive.", "Career": "Research.", "Rel": "Possessive."},
+        "Sagittarius": {"Gen": "Ruled by Jupiter, optimistic.", "Pers": "Philosophical.", "Phys": "Athletic.", "Health": "Hips/Liver.", "Career": "Teaching.", "Rel": "Adventurous."},
+        "Capricorn": {"Gen": "Ruled by Saturn, disciplined.", "Pers": "Ambitious.", "Phys": "Bony.", "Health": "Joints.", "Career": "Business.", "Rel": "Serious."},
+        "Aquarius": {"Gen": "Ruled by Saturn, innovative.", "Pers": "Humanitarian.", "Phys": "Unique.", "Health": "Ankles.", "Career": "Science.", "Rel": "Friendly."},
+        "Pisces": {"Gen": "Ruled by Jupiter, spiritual.", "Pers": "Compassionate.", "Phys": "Soft.", "Health": "Feet.", "Career": "Healing.", "Rel": "Soulful."}
+    }
+    return data.get(asc_sign_name, data["Aries"])
+
 def get_planet_positions(jd, lat, lon, birth_dt, lang):
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
@@ -277,7 +340,6 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
     charan = int(nak_deg / (360/27/4)) + 1
     
     # Calculate Paya (Footing)
-    # House of Moon relative to Lagna
     moon_house = ((int(moon_pos/30) - int(raw_bodies["Ascendant"]/30)) % 12) + 1
     if moon_house in [1, 6, 11]: paya = "Gold (Swarna)"
     elif moon_house in [2, 5, 9]: paya = "Silver (Rajat)"
@@ -298,33 +360,6 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
     }
 
     return charts_data, planet_details, kp_planets, kp_cusps, ruling_planets, summary, raw_bodies
-
-# --- DETAILED INTERPRETATIONS ---
-def get_detailed_interpretations(asc_sign_name):
-    """Returns detailed text for Summary Tab based on Ascendant"""
-    data = {
-        "Aries": {
-            "Gen": "As an Aries Ascendant, you are born under the sign of the Ram, ruled by Mars. This placement bestows upon you a dynamic, energetic, and pioneering spirit. You are a natural initiator who loves to start new projects.",
-            "Pers": "You possess a strong will and a direct approach to life. You are courageous, confident, and enthusiastic. However, you can also be impulsive and impatient. You value independence highly and often prefer to lead rather than follow.",
-            "Phys": "Physically, you tend to have a strong, athletic build with prominent features, often a distinct nose or eyebrows. You likely walk quickly and have an intense gaze. High energy levels are a hallmark of your constitution.",
-            "Health": "You are prone to issues related to the head, such as migraines, headaches, or fevers. Stress management is crucial for you. Regular exercise is not just good for your body but essential for venting your excess mental energy.",
-            "Career": "You thrive in competitive environments. Careers in the military, police, sports, engineering, or entrepreneurship suit you well. You need a role that offers autonomy and challenges rather than routine desk work.",
-            "Rel": "In relationships, you are passionate and direct. You enjoy the chase and are often the one to initiate interest. You need a partner who can match your energy but also has the patience to handle your occasional outbursts."
-        },
-        # (Default text for other signs to prevent crashes - Ideally expand this list)
-        "Taurus": {"Gen": "Ruled by Venus, stable and practical.", "Pers": "Patient and reliable.", "Phys": "Strong build.", "Health": "Throat issues.", "Career": "Finance/Arts.", "Rel": "Loyal."},
-        "Gemini": {"Gen": "Ruled by Mercury, intellectual.", "Pers": "Witty and adaptable.", "Phys": "Slender.", "Health": "Nervous system.", "Career": "Media.", "Rel": "Fun-loving."},
-        "Cancer": {"Gen": "Ruled by Moon, emotional.", "Pers": "Nurturing.", "Phys": "Soft features.", "Health": "Stomach.", "Career": "Caregiving.", "Rel": "Devoted."},
-        "Leo": {"Gen": "Ruled by Sun, regal.", "Pers": "Proud and generous.", "Phys": "Broad shoulders.", "Health": "Heart.", "Career": "Leadership.", "Rel": "Passionate."},
-        "Virgo": {"Gen": "Ruled by Mercury, analytical.", "Pers": "Perfectionist.", "Phys": "Neat.", "Health": "Digestion.", "Career": "Service.", "Rel": "Practical."},
-        "Libra": {"Gen": "Ruled by Venus, balanced.", "Pers": "Diplomatic.", "Phys": "Attractive.", "Health": "Kidneys.", "Career": "Law/Arts.", "Rel": "Romantic."},
-        "Scorpio": {"Gen": "Ruled by Mars, intense.", "Pers": "Secretive.", "Phys": "Piercing eyes.", "Health": "Reproductive.", "Career": "Research.", "Rel": "Possessive."},
-        "Sagittarius": {"Gen": "Ruled by Jupiter, optimistic.", "Pers": "Philosophical.", "Phys": "Athletic.", "Health": "Hips/Liver.", "Career": "Teaching.", "Rel": "Adventurous."},
-        "Capricorn": {"Gen": "Ruled by Saturn, disciplined.", "Pers": "Ambitious.", "Phys": "Bony.", "Health": "Joints.", "Career": "Business.", "Rel": "Serious."},
-        "Aquarius": {"Gen": "Ruled by Saturn, innovative.", "Pers": "Humanitarian.", "Phys": "Unique.", "Health": "Ankles.", "Career": "Science.", "Rel": "Friendly."},
-        "Pisces": {"Gen": "Ruled by Jupiter, spiritual.", "Pers": "Compassionate.", "Phys": "Soft.", "Health": "Feet.", "Career": "Healing.", "Rel": "Soulful."}
-    }
-    return data.get(asc_sign_name, data["Aries"])
 
 # --- VISUALIZATION ---
 def draw_chart(house_planets, asc_sign, style="North", title="Chart"):
@@ -363,44 +398,6 @@ def draw_chart(house_planets, asc_sign, style="North", title="Chart"):
             if h == 1: txt_p += "\n(Asc)"
             ax.text(x, y, txt_p, fontsize=6, fontweight='bold', ha='center', va='center')
     return fig
-
-# --- DASHA ENGINE ---
-def calculate_vimshottari_structure(jd, birth_date):
-    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-    nak_deg = (moon_pos * (27/360)) 
-    nak_idx = int(nak_deg)
-    balance_prop = 1 - (nak_deg - nak_idx)
-    lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
-    years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
-    start_lord_idx = nak_idx % 9
-    dashas = []
-    curr_date = birth_date
-    first_dur = years[start_lord_idx] * balance_prop
-    dashas.append({"Lord": lords[start_lord_idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=first_dur*365.25), "FullYears": years[start_lord_idx]})
-    curr_date = dashas[0]['End']
-    for i in range(1, 9):
-        idx = (start_lord_idx + i) % 9
-        dur = years[idx]
-        dashas.append({"Lord": lords[idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=dur*365.25), "FullYears": dur})
-        curr_date = dashas[-1]['End']
-    return dashas
-
-def get_sub_periods(lord_name, start_date, level_years):
-    lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
-    years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
-    try: start_idx = lords.index(lord_name)
-    except: return []
-    subs = []
-    curr = start_date
-    for i in range(9):
-        idx = (start_idx + i) % 9
-        sub_lord = lords[idx]
-        sub_years = years[idx]
-        duration_years = (level_years * sub_years) / 120
-        end_date = curr + datetime.timedelta(days=duration_years*365.25)
-        subs.append({"Lord": sub_lord, "Start": curr, "End": end_date, "Duration": duration_years, "FullYears": sub_years})
-        curr = end_date
-    return subs
 
 # --- 5. SIDEBAR ---
 with st.sidebar:
@@ -482,7 +479,7 @@ if st.session_state.current_data:
             st.write(f"**Karan:** {d['Summary']['Karan']}")
             st.write(f"**Yog:** {d['Summary']['Yoga']}")
         with pc2:
-            st.write(f"**Yunja:** {d['Summary']['Nadi']}") # Mapping Nadi to Yunja as per strict astrotalk format often aligns
+            st.write(f"**Yunja:** {d['Summary']['Nadi']}")
             st.write(f"**Tatva:** {d['Summary']['Tatva']}")
             st.write(f"**Paya:** {d['Summary']['Paya']}")
         with pc3:

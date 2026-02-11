@@ -19,6 +19,7 @@ st.markdown("""
     .stSelectbox label { font-weight: bold; }
     .interp-box { background-color: #0e1117; border: 1px solid #333; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
     h3 { font-size: 1.2rem; font-weight: 600; margin-top: 1rem; }
+    .status-guide { font-size: 0.9rem; color: #cccccc; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -382,8 +383,9 @@ with st.sidebar:
 if st.session_state.current_data:
     d = st.session_state.current_data
     
-    if 'House_Planets_D1' not in d:
-        st.warning("⚠️ Update applied. Click 'Generate Kundali' again.")
+    # SAFETY CHECK: Only works if "Mangalik" is in summary
+    if 'Summary' not in d or 'Mangalik' not in d['Summary']:
+        st.warning("⚠️ Data structure updated. Please click 'Generate Kundali' in the sidebar to refresh.")
         st.stop()
     
     tab1, tab2, tab3, tab4 = st.tabs(["📝 Summary", "🔮 Kundalis", "🗓️ Dashas", "🤖 AI Prediction"])
@@ -429,8 +431,20 @@ if st.session_state.current_data:
         st.subheader("Planetary Details")
         df = pd.DataFrame(d['Planet_Details'])
         st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        # --- PLANETARY STATUS REFERENCE ---
         st.divider()
-        st.caption("Ask the AI about your chart analysis in the next tab.")
+        st.subheader("📌 Planetary Status Guide")
+        
+        with st.expander("What do these statuses mean?", expanded=True):
+            st.markdown("""
+            * **Exalted (Ucha):** The planet is at its highest power and strongest position. Results are generally excellent.
+            * **Debilitated (Neecha):** The planet is at its lowest power and weakest position. Results may be weak or challenging.
+            * **Own Sign (Swakshetra):** The planet is in its own house (like being at home). It is comfortable, strong, and confident.
+            * **Friendly (Mitra):** The planet is in a friend's house. It functions well and cooperatively.
+            * **Neutral (Sama):** The planet is in a neutral house. It gives average or mixed results.
+            * **Enemy (Shatru):** The planet is in an enemy's house. It feels uncomfortable, restricted, or agitated.
+            """)
 
     # 3. DASHA TAB
     with tab3:
@@ -482,4 +496,3 @@ if st.session_state.current_data:
 else:
     st.title("☸️ TaraVaani")
     st.info("👈 Enter details to generate chart.")
-

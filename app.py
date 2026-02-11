@@ -5,28 +5,21 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from opencage.geocoder import OpenCageGeocode
 import google.generativeai as genai
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import pandas as pd
 
 # --- 1. CONFIGURATION ---
 st.set_page_config(page_title="TaraVaani", page_icon="☸️", layout="wide")
 
 st.markdown("""
 <style>
-    .header-box { 
-        background-color: #1e3a29; 
-        padding: 15px; 
-        border-radius: 10px; 
-        color: #90EE90; 
-        font-size: 18px; 
-        font-weight: bold; 
-        margin-bottom: 20px; 
-        text-align: center;
-    }
+    .header-box { background-color: #1e3a29; padding: 15px; border-radius: 10px; color: #90EE90; text-align: center; font-weight: bold; margin-bottom: 20px;}
     .stButton>button { width: 100%; border-radius: 8px; font-weight: bold; }
-    .stChatInput { position: fixed; bottom: 0; padding-bottom: 15px; z-index: 1000; background: #0E1117; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. FIREBASE CONNECTION ---
+# --- 2. FIREBASE & API SETUP ---
 if not firebase_admin._apps:
     try:
         raw_key = st.secrets["FIREBASE_SERVICE_ACCOUNT"]["private_key"].replace("\\n", "\n")
@@ -44,210 +37,221 @@ if not firebase_admin._apps:
             "universe_domain": "googleapis.com"
         }
         firebase_admin.initialize_app(credentials.Certificate(cred_info))
-    except Exception:
-        pass
+    except: pass
 
 db = firestore.client()
 
-# --- 3. API SETUP ---
-try:
-    geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
-except Exception:
-    geocoder = None
+try: geocoder = OpenCageGeocode(st.secrets["OPENCAGE_API_KEY"])
+except: geocoder = None
 
-# ✅ GEMINI CONFIGURATION
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-except Exception as e:
-    st.error(f"Gemini Key Error: {e}")
+try: genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except: pass
 
-# --- 4. SESSION STATE ---
-if 'user_id' not in st.session_state:
-    st.session_state.user_id = "suman_naskar_admin"
-if 'current_data' not in st.session_state:
-    st.session_state.current_data = None
+# --- 3. SESSION STATE ---
+if 'user_id' not in st.session_state: st.session_state.user_id = "suman_naskar_admin"
+if 'current_data' not in st.session_state: st.session_state.current_data = None
 
-# --- 5. CALCULATOR ENGINE ---
-def get_gana_yoni(nak):
-    data = {
-        "Ashwini": ("Deva", "Horse"), "Bharani": ("Manushya", "Elephant"),
-        "Krittika": ("Rakshasa", "Goat"), "Rohini": ("Manushya", "Snake"),
-        "Mrigashira": ("Deva", "Snake"), "Ardra": ("Manushya", "Dog"),
-        "Punarvasu": ("Deva", "Cat"), "Pushya": ("Deva", "Goat"),
-        "Ashlesha": ("Rakshasa", "Cat"), "Magha": ("Rakshasa", "Rat"),
-        "Purva Phalguni": ("Manushya", "Rat"), "Uttara Phalguni": ("Manushya", "Cow"),
-        "Hasta": ("Deva", "Buffalo"), "Chitra": ("Rakshasa", "Tiger"),
-        "Swati": ("Deva", "Buffalo"), "Vishakha": ("Rakshasa", "Tiger"),
-        "Anuradha": ("Deva", "Deer"), "Jyeshtha": ("Rakshasa", "Deer"),
-        "Mula": ("Rakshasa", "Dog"), "Purva Ashadha": ("Manushya", "Monkey"),
-        "Uttara Ashadha": ("Manushya", "Mongoose"), "Shravana": ("Deva", "Monkey"),
-        "Dhanishta": ("Rakshasa", "Lion"), "Shatabhisha": ("Rakshasa", "Horse"),
-        "Purva Bhadrapada": ("Manushya", "Lion"),
-        "Uttara Bhadrapada": ("Manushya", "Cow"), "Revati": ("Deva", "Elephant")
-    }
-    return data.get(nak, ("Unknown", "Unknown"))
+# --- 4. ASTROLOGY ENGINE (Charts & Dashas) ---
 
-def calculate_vedic_chart(name, gender, dt, tm, lat, lon, city, ayanamsa_mode="Lahiri (Standard)"):
-    if "Lahiri" in ayanamsa_mode:
-        swe.set_sid_mode(swe.SIDM_LAHIRI)
-    elif "Raman" in ayanamsa_mode:
-        swe.set_sid_mode(swe.SIDM_RAMAN)
-    elif "KP" in ayanamsa_mode:
-        swe.set_sid_mode(5)
-
-    birth_dt = datetime.datetime.combine(dt, tm)
-    utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
-    jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute / 60)
-
+def get_planet_positions(jd):
+    """Calculates planet positions and returns a dictionary mapping House -> List of Planets"""
     ayanamsa = swe.get_ayanamsa_ut(jd)
-    cusps, ascmc = swe.houses(jd, lat, lon, b'P')
+    cusps, ascmc = swe.houses(jd, 0, 0, b'P') 
     asc_deg = (ascmc[0] - ayanamsa) % 360
+    asc_sign = int(asc_deg // 30) + 1 
 
-    zodiac = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo",
-              "Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"]
-    lagna_sign = zodiac[int(asc_deg // 30)]
+    planet_map = {0:"Sun", 1:"Moon", 4:"Mars", 2:"Merc", 5:"Jup", 3:"Ven", 6:"Sat", 11:"Rahu", 10:"Ketu"}
+    house_planets = {i: [] for i in range(1, 13)}
+    planet_details = []
 
-    planet_map = {
-        "Sun": 0, "Moon": 1, "Mars": 4, "Mercury": 2,
-        "Jupiter": 5, "Venus": 3, "Saturn": 6, "Rahu": 11
-    }
-
-    nak_list = [
-        "Ashwini","Bharani","Krittika","Rohini","Mrigashira","Ardra",
-        "Punarvasu","Pushya","Ashlesha","Magha","Purva Phalguni",
-        "Uttara Phalguni","Hasta","Chitra","Swati","Vishakha",
-        "Anuradha","Jyeshtha","Mula","Purva Ashadha","Uttara Ashadha",
-        "Shravana","Dhanishta","Shatabhisha","Purva Bhadrapada",
-        "Uttara Bhadrapada","Revati"
-    ]
-
-    results = []
-    user_rashi, user_nak = "", ""
-
-    for p, pid in planet_map.items():
-        pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL | swe.FLG_MOSEPH)[0][0]
-        sign = zodiac[int(pos // 30) % 12]
+    for pid, name in planet_map.items():
+        if name == "Ketu":
+            rahu_pos = swe.calc_ut(jd, 11, swe.FLG_SIDEREAL)[0][0]
+            pos = (rahu_pos + 180) % 360
+        else:
+            pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)[0][0]
+            
+        sign = int(pos // 30) + 1 
         deg = pos % 30
-        nak = nak_list[int(pos / (360 / 27)) % 27]
-        results.append(f"{p}: {sign} ({deg:.2f}°) | {nak}")
-        if p == "Moon":
-            user_rashi, user_nak = sign, nak
+        house_num = ((sign - asc_sign) % 12) + 1
+        house_planets[house_num].append(f"{name}") 
+        planet_details.append({"Name": name, "Sign": sign, "Deg": deg, "House": house_num})
 
-    gana, yoni = get_gana_yoni(user_nak)
+    return house_planets, asc_sign, planet_details
 
-    return {
-        "Name": name,
-        "Gender": gender,
-        "Lagna": lagna_sign,
-        "Rashi": user_rashi,
-        "Nakshatra": user_nak,
-        "Gana": gana,
-        "Yoni": yoni,
-        "City": city,
-        "Full_Chart": "\n".join(results)
+def draw_north_indian_chart(house_planets, asc_sign):
+    """Draws the Diamond Style Chart"""
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.set_aspect('equal')
+    ax.axis('off')
+    
+    ax.plot([0, 1], [1, 0], 'k-', lw=2)
+    ax.plot([0, 1], [0, 1], 'k-', lw=2)
+    ax.plot([0, 0.5], [0.5, 0], 'k-', lw=2)
+    ax.plot([0.5, 1], [0, 0.5], 'k-', lw=2)
+    ax.plot([0.5, 1], [1, 0.5], 'k-', lw=2)
+    ax.plot([0, 0.5], [0.5, 1], 'k-', lw=2)
+    
+    rect = patches.Rectangle((0, 0), 1, 1, linewidth=2, edgecolor='black', facecolor='none')
+    ax.add_patch(rect)
+    
+    positions = {
+        1: (0.5, 0.8), 2: (0.25, 0.85), 3: (0.15, 0.75), 4: (0.2, 0.5),
+        5: (0.15, 0.25), 6: (0.25, 0.15), 7: (0.5, 0.2), 8: (0.75, 0.15),
+        9: (0.85, 0.25), 10: (0.8, 0.5), 11: (0.85, 0.75), 12: (0.75, 0.85)
     }
+    
+    for house, (x, y) in positions.items():
+        sign_num = ((asc_sign + house - 2) % 12) + 1
+        ax.text(x, y-0.05, str(sign_num), fontsize=10, color='red', ha='center')
+        planets = house_planets[house]
+        if planets:
+            p_text = "\n".join(planets)
+            ax.text(x, y, p_text, fontsize=9, fontweight='bold', ha='center', va='center')
 
-# --- 6. SIDEBAR UI ---
+    return fig
+
+def draw_south_indian_chart(planet_details):
+    """Draws the Square Style Chart"""
+    fig, ax = plt.subplots(figsize=(6, 6))
+    ax.set_aspect('equal')
+    ax.axis('off')
+    
+    for i in [0, 0.25, 0.5, 0.75, 1]:
+        ax.plot([0, 1], [i, i], 'k-', lw=1)
+        ax.plot([i, i], [0, 1], 'k-', lw=1)
+        
+    rect = patches.Rectangle((0.25, 0.25), 0.5, 0.5, color='white', zorder=10)
+    ax.add_patch(rect)
+    ax.text(0.5, 0.5, "Rashi\nChakra", ha='center', va='center', fontsize=12, fontweight='bold', zorder=11)
+    
+    sign_pos = {
+        1: (0.37, 0.87), 2: (0.62, 0.87), 3: (0.87, 0.87), 4: (0.87, 0.62),
+        5: (0.87, 0.37), 6: (0.87, 0.12), 7: (0.62, 0.12), 8: (0.37, 0.12),
+        9: (0.12, 0.12), 10: (0.12, 0.37), 11: (0.12, 0.62), 12: (0.12, 0.87)
+    }
+    
+    sign_planets = {i: [] for i in range(1, 13)}
+    for p in planet_details:
+        sign_planets[p['Sign']].append(p['Name'])
+        
+    for sign, (x, y) in sign_pos.items():
+        if sign_planets[sign]:
+            ax.text(x, y, "\n".join(sign_planets[sign]), ha='center', va='center', fontsize=8, fontweight='bold')
+            
+    return fig
+
+def calculate_dasha(jd):
+    """Calculates Vimshottari Mahadasha"""
+    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
+    nak_deg = (moon_pos * (27/360)) 
+    nak_idx = int(nak_deg) 
+    
+    lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
+    years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
+    
+    start_lord_idx = nak_idx % 9
+    
+    rows = []
+    for i in range(9):
+        idx = (start_lord_idx + i) % 9
+        lord = lords[idx]
+        dur = years[idx]
+        rows.append({"Lord": lord, "Duration": f"{dur} Years"})
+        
+    return pd.DataFrame(rows)
+
+# --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
-
-    st.markdown("### 🗣️ AI Language")
-    lang_opt = st.selectbox(
-        "Select output language",
-        ["English","Hindi","Bengali","Marathi","Tamil","Telugu","Kannada","Gujarati","Malayalam"],
-        label_visibility="collapsed"
-    )
-
-    st.header("Create Profile")
-    n_in = st.text_input("Full Name", "")
-    g_in = st.selectbox("Gender", ["Male","Female"])
-    d_in = st.date_input(
-        "Date of Birth",
-        value=None,
-        min_value=datetime.date(1900, 1, 1),
-        max_value=datetime.date.today(),
-        format="DD/MM/YYYY"
-    )
+    lang_opt = st.selectbox("Language", ["English", "Hindi", "Bengali", "Marathi", "Tamil", "Telugu", "Kannada", "Gujarati", "Malayalam"])
+    
+    st.header("Profile")
+    n_in = st.text_input("Name", "Suman Naskar")
+    g_in = st.selectbox("Gender", ["Male", "Female"])
+    d_in = st.date_input("DOB", value=datetime.date(1993, 4, 23), min_value=datetime.date(1900,1,1))
     c1, c2 = st.columns(2)
-    with c1: hr_in = st.selectbox("Hour (24h)", range(24), index=0, help="Birth hour")
-    with c2: mn_in = st.selectbox("Minute", range(60), index=0, help="Birth minute")
-
-    city_in = st.text_input("Birth City", "Kolkata, India")
-
+    hr_in = c1.selectbox("Hour", range(24), index=15)
+    mn_in = c2.selectbox("Min", range(60), index=45)
+    city_in = st.text_input("City", "Kolkata, India")
+    
+    # --- UPDATED SETTINGS SECTION ---
     with st.expander("⚙️ Advanced Settings"):
-        ayanamsa_opt = st.selectbox(
-            "Calculation System",
-            ["Lahiri (Standard)","Raman (Traditional)","KP (Krishnamurti)"]
-        )
-
+        st.caption("Chart Configuration")
+        # Added Chart Style here as requested
+        chart_style = st.selectbox("Chart Style", ["North Indian (Diamond)", "South Indian (Square)"])
+        ayanamsa_opt = st.selectbox("Calculation System", ["Lahiri (Standard)", "Raman (Traditional)", "KP (Krishnamurti)"])
+    
     if st.button("Generate Kundali", type="primary"):
-        if not n_in.strip():
-            st.error("Please enter your full name.")
-            st.stop()
         with st.spinner("Calculating..."):
-            res = geocoder.geocode(city_in)
-            if res:
-                lat, lon = res[0]["geometry"]["lat"], res[0]["geometry"]["lng"]
-                chart = calculate_vedic_chart(
-                    n_in, g_in, d_in,
-                    datetime.time(hr_in, mn_in),
-                    lat, lon, res[0]["formatted"], ayanamsa_opt
-                )
-                st.session_state.current_data = chart
-                st.rerun()
+            try:
+                res = geocoder.geocode(city_in)
+                if res:
+                    lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
+                    
+                    birth_dt = datetime.datetime.combine(d_in, datetime.time(hr_in, mn_in))
+                    utc_dt = birth_dt - datetime.timedelta(hours=5, minutes=30)
+                    jd = swe.julday(utc_dt.year, utc_dt.month, utc_dt.day, utc_dt.hour + utc_dt.minute/60.0)
+                    
+                    if "Lahiri" in ayanamsa_opt: swe.set_sid_mode(swe.SIDM_LAHIRI)
+                    elif "Raman" in ayanamsa_opt: swe.set_sid_mode(swe.SIDM_RAMAN)
+                    elif "KP" in ayanamsa_opt: swe.set_sid_mode(5)
+                    
+                    house_planets, asc_sign, planet_details = get_planet_positions(jd)
+                    dasha_df = calculate_dasha(jd)
+                    
+                    st.session_state.current_data = {
+                        "Name": n_in, "Gender": g_in, 
+                        "House_Planets": house_planets, "Asc_Sign": asc_sign,
+                        "Planet_Details": planet_details,
+                        "Dasha_DF": dasha_df,
+                        "Chart_Style": chart_style, # Save preference
+                        "Full_Chart_Text": str(planet_details) 
+                    }
+                    st.rerun()
+                else: st.error("City not found.")
+            except Exception as e: st.error(f"Error: {e}")
 
-# --- 7. MAIN UI ---
+# --- 6. MAIN UI ---
 if st.session_state.current_data:
     d = st.session_state.current_data
-
+    
     st.markdown(f'<div class="header-box">Janma Kundali: {d["Name"]} 🙏</div>', unsafe_allow_html=True)
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Lagna", d['Lagna'])
-    c2.metric("Rashi", d['Rashi'])
-    c3.metric("Nakshatra", d['Nakshatra'])
-    c4.metric("Gana", d['Gana'])
-    c5.metric("Yoni", d['Yoni'])
-
-    st.divider()
-    st.subheader("📜 Planetary Degrees")
-    st.code(d['Full_Chart'], language="text")
-    st.divider()
-
-    st.subheader(f"🤖 Ask TaraVaani ({lang_opt})")
-    q_topic = st.selectbox(
-        "Choose a Topic",
-        ["General Life Overview","Career & Success","Marriage & Relationships","Health & Vitality","Wealth & Finance"]
-    )
-
-    if st.button("✨ Get Prediction"):
-        # ✅ UPDATED PROMPT WITH 'RADHE RADHE'
-        prompt = f"""
-Act as Vedic Astrologer TaraVaani.
-User: {d['Name']} ({d['Gender']}).
-Chart:
-- Lagna: {d['Lagna']}
-- Rashi: {d['Rashi']}
-- Nakshatra: {d['Nakshatra']}
-- Planets: {d['Full_Chart']}
-
-Question: Predict about {q_topic}.
-IMPORTANT:
-1. Start response with "Radhe Radhe 🙏".
-2. Write response in {lang_opt} language.
-Style: Mystic, positive, clear. Use bullet points.
-"""
+    
+    # TABS
+    tab1, tab2, tab3 = st.tabs(["📊 Lagna Chart", "🗓️ Dasha Periods", "🤖 AI Prediction"])
+    
+    with tab1:
+        st.subheader(f"{d['Chart_Style']}")
+        if "North" in d['Chart_Style']:
+            fig = draw_north_indian_chart(d['House_Planets'], d['Asc_Sign'])
+        else:
+            fig = draw_south_indian_chart(d['Planet_Details'])
+        st.pyplot(fig)
         
-        # ✅ GEMINI 1.5 FLASH LOGIC
-        try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
-            st.info(response.text)
-        except Exception as e:
-            st.error(f"AI Error: {e}")
-            if "404" in str(e):
-                st.warning("⚠️ Billing Verification Pending: Google is verifying your ID. The API will unlock automatically in 24-48 hours.")
-
+    with tab2:
+        st.subheader("Vimshottari Dasha Sequence")
+        st.dataframe(d['Dasha_DF'], use_container_width=True)
+        
+    with tab3:
+        st.subheader(f"Ask TaraVaani ({lang_opt})")
+        q_topic = st.selectbox("Topic", ["General Life", "Career", "Marriage", "Health", "Wealth"])
+        
+        if st.button("✨ Get Prediction"):
+            prompt = f"""
+            Act as Vedic Astrologer TaraVaani.
+            User: {d['Name']} ({d['Gender']}).
+            Planetary Positions: {d['Full_Chart_Text']}
+            Question: Predict about {q_topic}.
+            Start with "Radhe Radhe 🙏". Answer in {lang_opt}.
+            """
+            try:
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content(prompt)
+                st.info(response.text)
+            except Exception as e:
+                st.error(f"AI Error: {e}")
+                if "404" in str(e): st.warning("⚠️ Google Billing Check Pending. Use Free Key or wait 24h.")
 else:
     st.title("☸️ TaraVaani")
-    st.info("👈 Please enter birth details in the sidebar to begin.")
+    st.info("👈 Enter details to generate chart.")

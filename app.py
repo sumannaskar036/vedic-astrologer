@@ -67,25 +67,19 @@ if 'current_data' not in st.session_state: st.session_state.current_data = None
 # --- 5. ASTROLOGY ENGINE ---
 
 def get_kp_lords(deg):
-    """Calculates Sign, Star (Nakshatra) and Sub Lord for KP"""
     lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
     years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
     zodiac_lords = ["Mars", "Venus", "Mercury", "Moon", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter"]
-    
     sign_idx = int(deg / 30)
     sign_lord = zodiac_lords[sign_idx % 12]
-    
     nak_span = 13 + (20/60) 
     nak_idx_total = int(deg / nak_span)
     star_lord = lords[nak_idx_total % 9]
-    
     deg_in_nak = deg - (nak_idx_total * nak_span)
     min_in_nak = deg_in_nak * 60
-    
     curr_sub = nak_idx_total % 9
     acc_min = 0
     sub_lord = lords[curr_sub]
-    
     for _ in range(9):
         period_min = (years[curr_sub] / 120) * 800
         if min_in_nak < (acc_min + period_min):
@@ -93,11 +87,9 @@ def get_kp_lords(deg):
             break
         acc_min += period_min
         curr_sub = (curr_sub + 1) % 9
-        
     return sign_lord, star_lord, sub_lord
 
 def calculate_varga_sign(deg, varga_num):
-    """Calculates Varga Sign for 19 Charts"""
     sign_idx = int(deg / 30)
     deg_in_sign = deg % 30
     if varga_num == 1: return sign_idx + 1
@@ -120,19 +112,17 @@ def calculate_varga_sign(deg, varga_num):
         start = sign_idx if (sign_idx % 2 == 0) else (sign_idx + 8)
         return ((start + int(deg_in_sign/3)) % 12) + 1
     elif varga_num == 12: return ((sign_idx + int(deg_in_sign/2.5)) % 12) + 1
-    # Harmonic fallback for higher vargas
     return (int(deg * varga_num / 30) % 12) + 1
 
 def get_nakshatra_properties(nak_name, rashi_name, charan):
     ganas = {"Deva": ["Ashwini", "Mrigashira", "Punarvasu", "Pushya", "Hasta", "Swati", "Anuradha", "Shravana", "Revati"], "Manushya": ["Bharani", "Rohini", "Ardra", "Purva Phalguni", "Uttara Phalguni", "Purva Ashadha", "Uttara Ashadha", "Purva Bhadrapada", "Uttara Bhadrapada"], "Rakshasa": ["Krittika", "Ashlesha", "Magha", "Chitra", "Vishakha", "Jyeshtha", "Mula", "Dhanishta", "Shatabhisha"]}
     gana = next((g for g, naks in ganas.items() if nak_name in naks), "Unknown")
-    
     yonis = {"Horse": ["Ashwini", "Shatabhisha"], "Elephant": ["Bharani", "Revati"], "Goat": ["Krittika", "Pushya"], "Snake": ["Rohini", "Mrigashira"], "Dog": ["Ardra", "Mula"], "Cat": ["Punarvasu", "Ashlesha"], "Rat": ["Magha", "Purva Phalguni"], "Cow": ["Uttara Phalguni", "Uttara Bhadrapada"], "Buffalo": ["Hasta", "Swati"], "Tiger": ["Chitra", "Vishakha"], "Deer": ["Anuradha", "Jyeshtha"], "Monkey": ["Purva Ashadha", "Shravana"], "Mongoose": ["Uttara Ashadha"], "Lion": ["Dhanishta", "Purva Bhadrapada"]}
     yoni = next((y for y, naks in yonis.items() if nak_name in naks), "Unknown")
-    
     nadis = {"Adi (Vata)": ["Ashwini", "Ardra", "Punarvasu", "Uttara Phalguni", "Hasta", "Jyeshtha", "Mula", "Shatabhisha", "Purva Bhadrapada"], "Madhya (Pitta)": ["Bharani", "Mrigashira", "Pushya", "Purva Phalguni", "Chitra", "Anuradha", "Purva Ashadha", "Dhanishta", "Uttara Bhadrapada"], "Antya (Kapha)": ["Krittika", "Rohini", "Ashlesha", "Magha", "Swati", "Vishakha", "Uttara Ashadha", "Shravana", "Revati"]}
     nadi = next((n for n, naks in nadis.items() if nak_name in naks), "Unknown")
     
+    # Tatva Logic
     rashi_props = {"Aries": ("Kshatriya", "Chatushpad", "Fire"), "Taurus": ("Vaishya", "Chatushpad", "Earth"), "Gemini": ("Shudra", "Manav", "Air"), "Cancer": ("Brahmin", "Jalchar", "Water"), "Leo": ("Kshatriya", "Vanchar", "Fire"), "Virgo": ("Vaishya", "Manav", "Earth"), "Libra": ("Shudra", "Manav", "Air"), "Scorpio": ("Brahmin", "Keet", "Water"), "Sagittarius": ("Kshatriya", "Manav/Chatushpad", "Fire"), "Capricorn": ("Vaishya", "Jalchar", "Earth"), "Aquarius": ("Shudra", "Manav", "Air"), "Pisces": ("Brahmin", "Jalchar", "Water")}
     varna, vashya, tatva = rashi_props.get(rashi_name, ("Unknown", "Unknown", "Unknown"))
     
@@ -164,18 +154,15 @@ def calculate_panchang(jd, lat, lon, birth_dt, moon_pos):
         sr_time = f"{int(sunrise[3]):02d}:{int(sunrise[4]):02d}:{int(sunrise[5]):02d}"
         ss_time = f"{int(sunset[3]):02d}:{int(sunset[4]):02d}:{int(sunset[5]):02d}"
     except: sr_time, ss_time = "Unknown", "Unknown"
-    
     sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
     diff = (moon_pos - sun_pos) % 360
     tithi_num = int(diff / 12) + 1
     paksha = "Shukla" if tithi_num <= 15 else "Krishna"
     tithi_name = f"{paksha} {tithi_num if tithi_num <= 15 else tithi_num - 15}"
-    
     total = (moon_pos + sun_pos) % 360
     yoga_num = int(total / (13 + 20/60)) + 1
     yogas = ["Vishkumbha", "Priti", "Ayushman", "Saubhagya", "Sobhana", "Atiganda", "Sukarma", "Dhriti", "Shula", "Ganda", "Vriddhi", "Dhruva", "Vyaghata", "Harshana", "Vajra", "Siddhi", "Vyatipata", "Variyan", "Parigha", "Shiva", "Siddha", "Sadhya", "Shubha", "Shukla", "Brahma", "Indra", "Vaidhriti"]
     yoga_name = yogas[yoga_num - 1] if 0 < yoga_num <= 27 else "Unknown"
-    
     karan_num = int(diff / 6) + 1
     karan_name = f"Karana {karan_num}"
     ayanamsa = swe.get_ayanamsa_ut(jd)
@@ -194,23 +181,17 @@ def get_navamsa_pos(deg):
     nav_sign_idx = (base + nav_num) % 12
     return nav_sign_idx + 1
 
-# --- THIS WAS THE MISSING FUNCTION CAUSING ERROR ---
 def get_planet_status(planet, sign_name):
-    # Standardize to Title Case for safety
     planet = planet.title()
     sign_name = sign_name.title()
-    
     sign_map = {"Aries":1, "Taurus":2, "Gemini":3, "Cancer":4, "Leo":5, "Virgo":6, "Libra":7, "Scorpio":8, "Sagittarius":9, "Capricorn":10, "Aquarius":11, "Pisces":12}
     s_id = sign_map.get(sign_name, 0)
-    
     if planet in ["Ascendant", "Uranus", "Neptune", "Pluto", "Rahu", "Ketu"]: return "--"
-    
     own = {"Sun":[5], "Moon":[4], "Mars":[1,8], "Mercury":[3,6], "Jupiter":[9,12], "Venus":[2,7], "Saturn":[10,11]}
     exalted = {"Sun":1, "Moon":2, "Mars":10, "Mercury":6, "Jupiter":4, "Venus":12, "Saturn":7}
     debilitated = {"Sun":7, "Moon":8, "Mars":4, "Mercury":12, "Jupiter":10, "Venus":6, "Saturn":1}
     friends = {"Sun":[4,1,8,9,12], "Moon":[5,3,6], "Mars":[5,4,9,12], "Mercury":[5,2,7], "Jupiter":[5,4,1,8], "Venus":[3,6,10,11], "Saturn":[3,6,2,7]}
     enemies = {"Sun":[2,7,10,11], "Moon":[], "Mars":[3,6], "Mercury":[4], "Jupiter":[3,6,2,7], "Venus":[5,4], "Saturn":[5,4,1,8]}
-    
     if s_id in own.get(planet, []): return "Own Sign"
     if exalted.get(planet) == s_id: return "Exalted"
     if debilitated.get(planet) == s_id: return "Debilitated"
@@ -218,30 +199,20 @@ def get_planet_status(planet, sign_name):
     if s_id in enemies.get(planet, []): return "Enemy"
     return "Neutral"
 
-# --- DETAILED INTERPRETATIONS ---
 def get_detailed_interpretations(asc_sign_name):
-    """Returns detailed text for Summary Tab based on Ascendant"""
     data = {
-        "Aries": {
-            "Gen": "As an Aries Ascendant, you are born under the sign of the Ram, ruled by Mars. This placement bestows upon you a dynamic, energetic, and pioneering spirit. You are a natural initiator who loves to start new projects.",
-            "Pers": "You possess a strong will and a direct approach to life. You are courageous, confident, and enthusiastic. However, you can also be impulsive and impatient. You value independence highly and often prefer to lead rather than follow.",
-            "Phys": "Physically, you tend to have a strong, athletic build with prominent features, often a distinct nose or eyebrows. You likely walk quickly and have an intense gaze. High energy levels are a hallmark of your constitution.",
-            "Health": "You are prone to issues related to the head, such as migraines, headaches, or fevers. Stress management is crucial for you. Regular exercise is not just good for your body but essential for venting your excess mental energy.",
-            "Career": "You thrive in competitive environments. Careers in the military, police, sports, engineering, or entrepreneurship suit you well. You need a role that offers autonomy and challenges rather than routine desk work.",
-            "Rel": "In relationships, you are passionate and direct. You enjoy the chase and are often the one to initiate interest. You need a partner who can match your energy but also has the patience to handle your occasional outbursts."
-        },
-        # (Default text for other signs to prevent crashes - Ideally expand this list)
-        "Taurus": {"Gen": "Ruled by Venus, stable and practical.", "Pers": "Patient and reliable.", "Phys": "Strong build.", "Health": "Throat issues.", "Career": "Finance/Arts.", "Rel": "Loyal."},
-        "Gemini": {"Gen": "Ruled by Mercury, intellectual.", "Pers": "Witty and adaptable.", "Phys": "Slender.", "Health": "Nervous system.", "Career": "Media.", "Rel": "Fun-loving."},
-        "Cancer": {"Gen": "Ruled by Moon, emotional.", "Pers": "Nurturing.", "Phys": "Soft features.", "Health": "Stomach.", "Career": "Caregiving.", "Rel": "Devoted."},
-        "Leo": {"Gen": "Ruled by Sun, regal.", "Pers": "Proud and generous.", "Phys": "Broad shoulders.", "Health": "Heart.", "Career": "Leadership.", "Rel": "Passionate."},
-        "Virgo": {"Gen": "Ruled by Mercury, analytical.", "Pers": "Perfectionist.", "Phys": "Neat.", "Health": "Digestion.", "Career": "Service.", "Rel": "Practical."},
-        "Libra": {"Gen": "Ruled by Venus, balanced.", "Pers": "Diplomatic.", "Phys": "Attractive.", "Health": "Kidneys.", "Career": "Law/Arts.", "Rel": "Romantic."},
-        "Scorpio": {"Gen": "Ruled by Mars, intense.", "Pers": "Secretive.", "Phys": "Piercing eyes.", "Health": "Reproductive.", "Career": "Research.", "Rel": "Possessive."},
-        "Sagittarius": {"Gen": "Ruled by Jupiter, optimistic.", "Pers": "Philosophical.", "Phys": "Athletic.", "Health": "Hips/Liver.", "Career": "Teaching.", "Rel": "Adventurous."},
-        "Capricorn": {"Gen": "Ruled by Saturn, disciplined.", "Pers": "Ambitious.", "Phys": "Bony.", "Health": "Joints.", "Career": "Business.", "Rel": "Serious."},
-        "Aquarius": {"Gen": "Ruled by Saturn, innovative.", "Pers": "Humanitarian.", "Phys": "Unique.", "Health": "Ankles.", "Career": "Science.", "Rel": "Friendly."},
-        "Pisces": {"Gen": "Ruled by Jupiter, spiritual.", "Pers": "Compassionate.", "Phys": "Soft.", "Health": "Feet.", "Career": "Healing.", "Rel": "Soulful."}
+        "Aries": { "Gen": "Dynamic, energetic, pioneering.", "Pers": "Courageous, impatient, leader.", "Phys": "Athletic, prominent features.", "Health": "Headaches, fevers.", "Career": "Military, sports.", "Rel": "Passionate, direct." },
+        "Taurus": { "Gen": "Stable, practical, grounded.", "Pers": "Reliable, stubborn.", "Phys": "Sturdy build.", "Health": "Throat issues.", "Career": "Finance, arts.", "Rel": "Loyal, sensual." },
+        "Gemini": { "Gen": "Intellectual, adaptable.", "Pers": "Witty, restless.", "Phys": "Slender, expressive.", "Health": "Nerves, lungs.", "Career": "Media, sales.", "Rel": "Fun, flirtatious." },
+        "Cancer": { "Gen": "Emotional, intuitive.", "Pers": "Nurturing, moody.", "Phys": "Round face, soft.", "Health": "Stomach.", "Career": "Nursing, home.", "Rel": "Devoted, protective." },
+        "Leo": { "Gen": "Regal, confident.", "Pers": "Generous, proud.", "Phys": "Broad shoulders.", "Health": "Heart, spine.", "Career": "Leadership, acting.", "Rel": "Romantic, loyal." },
+        "Virgo": { "Gen": "Analytical, practical.", "Pers": "Modest, critical.", "Phys": "Neat, youthful.", "Health": "Digestion.", "Career": "Data, service.", "Rel": "Practical, devoted." },
+        "Libra": { "Gen": "Diplomatic, balanced.", "Pers": "Charming, indecisive.", "Phys": "Attractive, balanced.", "Health": "Kidneys.", "Career": "Law, arts.", "Rel": "Romantic, partner-focused." },
+        "Scorpio": { "Gen": "Intense, secretive.", "Pers": "Determined, magnetic.", "Phys": "Piercing eyes.", "Health": "Reproductive.", "Career": "Research, occult.", "Rel": "Possessive, deep." },
+        "Sagittarius": { "Gen": "Optimistic, adventurous.", "Pers": "Honest, blunt.", "Phys": "Tall, athletic.", "Health": "Hips, liver.", "Career": "Teaching, travel.", "Rel": "Freedom-loving." },
+        "Capricorn": { "Gen": "Ambitious, disciplined.", "Pers": "Serious, patient.", "Phys": "Lean, bony.", "Health": "Knees, skin.", "Career": "Corporate, admin.", "Rel": "Cautious, loyal." },
+        "Aquarius": { "Gen": "Innovative, humanitarian.", "Pers": "Friendly, detached.", "Phys": "Unique features.", "Health": "Ankles, circulation.", "Career": "Tech, science.", "Rel": "Intellectual, free." },
+        "Pisces": { "Gen": "Spiritual, dreamy.", "Pers": "Compassionate, escapist.", "Phys": "Soft eyes.", "Health": "Feet.", "Career": "Creative, healing.", "Rel": "Soulful, giving." }
     }
     return data.get(asc_sign_name, data["Aries"])
 
@@ -262,7 +233,7 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
             pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)[0][0]
         raw_bodies[name] = pos
 
-    # --- VARGA CALCULATION ---
+    # VARGAS
     varga_list = [1, 2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60]
     charts_data = {}
     
@@ -303,7 +274,6 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
         nak_name = nak_list[int(p_deg / (360/27)) % 27]
         house_d1 = ((int(p_deg/30) - int(raw_bodies["Ascendant"]/30)) % 12) + 1
         
-        # RESTORED: Status Calculation
         status = get_planet_status(p_name, sign_name)
         
         planet_details.append({

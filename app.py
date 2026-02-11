@@ -54,6 +54,7 @@ except: pass
 # --- 3. TRANSLATION ENGINE ---
 TRANSLATIONS = {
     "English": {"title": "TaraVaani", "gen_btn": "Generate Kundali", "tab_summary": "📝 Summary", "tab_kundalis": "🔮 Kundalis", "tab_kp": "⭐ KP System", "tab_charts": "📊 All Charts", "tab_dashas": "🗓️ Dashas", "tab_ai": "🤖 AI Prediction", "asc": "Ascendant", "mangalik_yes": "Yes (Mangalik)", "mangalik_no": "No", "bhav_chart": "Bhav Chalit Chart"},
+    # Fallback to English for UI stability
 }
 
 def txt(key, lang):
@@ -67,19 +68,25 @@ if 'current_data' not in st.session_state: st.session_state.current_data = None
 # --- 5. ASTROLOGY ENGINE ---
 
 def get_kp_lords(deg):
+    """Calculates Sign, Star (Nakshatra) and Sub Lord for KP"""
     lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
     years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
     zodiac_lords = ["Mars", "Venus", "Mercury", "Moon", "Sun", "Mercury", "Venus", "Mars", "Jupiter", "Saturn", "Saturn", "Jupiter"]
+    
     sign_idx = int(deg / 30)
     sign_lord = zodiac_lords[sign_idx % 12]
+    
     nak_span = 13 + (20/60) 
     nak_idx_total = int(deg / nak_span)
     star_lord = lords[nak_idx_total % 9]
+    
     deg_in_nak = deg - (nak_idx_total * nak_span)
     min_in_nak = deg_in_nak * 60
+    
     curr_sub = nak_idx_total % 9
     acc_min = 0
     sub_lord = lords[curr_sub]
+    
     for _ in range(9):
         period_min = (years[curr_sub] / 120) * 800
         if min_in_nak < (acc_min + period_min):
@@ -87,9 +94,11 @@ def get_kp_lords(deg):
             break
         acc_min += period_min
         curr_sub = (curr_sub + 1) % 9
+        
     return sign_lord, star_lord, sub_lord
 
 def calculate_varga_sign(deg, varga_num):
+    """Calculates Varga Sign for 19 Charts"""
     sign_idx = int(deg / 30)
     deg_in_sign = deg % 30
     if varga_num == 1: return sign_idx + 1
@@ -112,39 +121,21 @@ def calculate_varga_sign(deg, varga_num):
         start = sign_idx if (sign_idx % 2 == 0) else (sign_idx + 8)
         return ((start + int(deg_in_sign/3)) % 12) + 1
     elif varga_num == 12: return ((sign_idx + int(deg_in_sign/2.5)) % 12) + 1
+    # Harmonic fallback for higher vargas
     return (int(deg * varga_num / 30) % 12) + 1
 
-def get_nakshatra_properties(nak_name, rashi_name, charan):
+def get_nakshatra_properties(nak_name, rashi_name):
     ganas = {"Deva": ["Ashwini", "Mrigashira", "Punarvasu", "Pushya", "Hasta", "Swati", "Anuradha", "Shravana", "Revati"], "Manushya": ["Bharani", "Rohini", "Ardra", "Purva Phalguni", "Uttara Phalguni", "Purva Ashadha", "Uttara Ashadha", "Purva Bhadrapada", "Uttara Bhadrapada"], "Rakshasa": ["Krittika", "Ashlesha", "Magha", "Chitra", "Vishakha", "Jyeshtha", "Mula", "Dhanishta", "Shatabhisha"]}
     gana = next((g for g, naks in ganas.items() if nak_name in naks), "Unknown")
     yonis = {"Horse": ["Ashwini", "Shatabhisha"], "Elephant": ["Bharani", "Revati"], "Goat": ["Krittika", "Pushya"], "Snake": ["Rohini", "Mrigashira"], "Dog": ["Ardra", "Mula"], "Cat": ["Punarvasu", "Ashlesha"], "Rat": ["Magha", "Purva Phalguni"], "Cow": ["Uttara Phalguni", "Uttara Bhadrapada"], "Buffalo": ["Hasta", "Swati"], "Tiger": ["Chitra", "Vishakha"], "Deer": ["Anuradha", "Jyeshtha"], "Monkey": ["Purva Ashadha", "Shravana"], "Mongoose": ["Uttara Ashadha"], "Lion": ["Dhanishta", "Purva Bhadrapada"]}
     yoni = next((y for y, naks in yonis.items() if nak_name in naks), "Unknown")
     nadis = {"Adi (Vata)": ["Ashwini", "Ardra", "Punarvasu", "Uttara Phalguni", "Hasta", "Jyeshtha", "Mula", "Shatabhisha", "Purva Bhadrapada"], "Madhya (Pitta)": ["Bharani", "Mrigashira", "Pushya", "Purva Phalguni", "Chitra", "Anuradha", "Purva Ashadha", "Dhanishta", "Uttara Bhadrapada"], "Antya (Kapha)": ["Krittika", "Rohini", "Ashlesha", "Magha", "Swati", "Vishakha", "Uttara Ashadha", "Shravana", "Revati"]}
     nadi = next((n for n, naks in nadis.items() if nak_name in naks), "Unknown")
-    
-    # Tatva Logic
-    rashi_props = {"Aries": ("Kshatriya", "Chatushpad", "Fire"), "Taurus": ("Vaishya", "Chatushpad", "Earth"), "Gemini": ("Shudra", "Manav", "Air"), "Cancer": ("Brahmin", "Jalchar", "Water"), "Leo": ("Kshatriya", "Vanchar", "Fire"), "Virgo": ("Vaishya", "Manav", "Earth"), "Libra": ("Shudra", "Manav", "Air"), "Scorpio": ("Brahmin", "Keet", "Water"), "Sagittarius": ("Kshatriya", "Manav/Chatushpad", "Fire"), "Capricorn": ("Vaishya", "Jalchar", "Earth"), "Aquarius": ("Shudra", "Manav", "Air"), "Pisces": ("Brahmin", "Jalchar", "Water")}
-    varna, vashya, tatva = rashi_props.get(rashi_name, ("Unknown", "Unknown", "Unknown"))
-    
+    rashi_props = {"Aries": ("Kshatriya", "Chatushpad"), "Taurus": ("Vaishya", "Chatushpad"), "Gemini": ("Shudra", "Manav"), "Cancer": ("Brahmin", "Jalchar"), "Leo": ("Kshatriya", "Vanchar"), "Virgo": ("Vaishya", "Manav"), "Libra": ("Shudra", "Manav"), "Scorpio": ("Brahmin", "Keet"), "Sagittarius": ("Kshatriya", "Manav/Chatushpad"), "Capricorn": ("Vaishya", "Jalchar"), "Aquarius": ("Shudra", "Manav"), "Pisces": ("Brahmin", "Jalchar")}
+    varna, vashya = rashi_props.get(rashi_name, ("Unknown", "Unknown"))
     lords = {"Aries": "Mars", "Taurus": "Venus", "Gemini": "Mercury", "Cancer": "Moon", "Leo": "Sun", "Virgo": "Mercury", "Libra": "Venus", "Scorpio": "Mars", "Sagittarius": "Jupiter", "Capricorn": "Saturn", "Aquarius": "Saturn", "Pisces": "Jupiter"}
     lord = lords.get(rashi_name, "Unknown")
-    
-    # Name Alphabet Logic
-    name_map = {
-        "Ashwini": ["Chu", "Che", "Cho", "La"], "Bharani": ["Li", "Lu", "Le", "Lo"], "Krittika": ["A", "I", "U", "E"],
-        "Rohini": ["O", "Va", "Vi", "Vu"], "Mrigashira": ["Ve", "Vo", "Ka", "Ki"], "Ardra": ["Ku", "Gha", "Ng", "Chha"],
-        "Punarvasu": ["Ke", "Ko", "Ha", "Hi"], "Pushya": ["Hu", "He", "Ho", "Da"], "Ashlesha": ["Di", "Du", "De", "Do"],
-        "Magha": ["Ma", "Mi", "Mu", "Me"], "Purva Phalguni": ["Mo", "Ta", "Ti", "Tu"], "Uttara Phalguni": ["Te", "To", "Pa", "Pi"],
-        "Hasta": ["Pu", "Sha", "Na", "Tha"], "Chitra": ["Pe", "Po", "Ra", "Ri"], "Swati": ["Ru", "Re", "Ro", "Ta"],
-        "Vishakha": ["Ti", "Tu", "Te", "To"], "Anuradha": ["Na", "Ni", "Nu", "Ne"], "Jyeshtha": ["No", "Ya", "Yi", "Yu"],
-        "Mula": ["Ye", "Yo", "Ba", "Bi"], "Purva Ashadha": ["Bu", "Dha", "Bha", "Dha"], "Uttara Ashadha": ["Bhe", "Bho", "Ja", "Ji"],
-        "Shravana": ["Ju", "Je", "Jo", "Gha"], "Dhanishta": ["Ga", "Gi", "Gu", "Ge"], "Shatabhisha": ["Go", "Sa", "Si", "Su"],
-        "Purva Bhadrapada": ["Se", "So", "Da", "Di"], "Uttara Bhadrapada": ["Du", "Tha", "Jha", "Da"], "Revati": ["De", "Do", "Cha", "Chi"]
-    }
-    sounds = name_map.get(nak_name, ["-", "-", "-", "-"])
-    name_alpha = sounds[charan - 1] if 0 < charan <= 4 else "-"
-
-    return {"Varna": varna, "Vashya": vashya, "Yoni": yoni, "Gana": gana, "Nadi": nadi, "SignLord": lord, "Tatva": tatva, "NameAlpha": name_alpha}
+    return {"Varna": varna, "Vashya": vashya, "Yoni": yoni, "Gana": gana, "Nadi": nadi, "SignLord": lord}
 
 def calculate_panchang(jd, lat, lon, birth_dt, moon_pos):
     try:
@@ -154,6 +145,7 @@ def calculate_panchang(jd, lat, lon, birth_dt, moon_pos):
         sr_time = f"{int(sunrise[3]):02d}:{int(sunrise[4]):02d}:{int(sunrise[5]):02d}"
         ss_time = f"{int(sunset[3]):02d}:{int(sunset[4]):02d}:{int(sunset[5]):02d}"
     except: sr_time, ss_time = "Unknown", "Unknown"
+    
     sun_pos = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
     diff = (moon_pos - sun_pos) % 360
     tithi_num = int(diff / 12) + 1
@@ -182,16 +174,21 @@ def get_navamsa_pos(deg):
     return nav_sign_idx + 1
 
 def get_planet_status(planet, sign_name):
+    # Standardize to Title Case for safety
     planet = planet.title()
     sign_name = sign_name.title()
+    
     sign_map = {"Aries":1, "Taurus":2, "Gemini":3, "Cancer":4, "Leo":5, "Virgo":6, "Libra":7, "Scorpio":8, "Sagittarius":9, "Capricorn":10, "Aquarius":11, "Pisces":12}
     s_id = sign_map.get(sign_name, 0)
+    
     if planet in ["Ascendant", "Uranus", "Neptune", "Pluto", "Rahu", "Ketu"]: return "--"
+    
     own = {"Sun":[5], "Moon":[4], "Mars":[1,8], "Mercury":[3,6], "Jupiter":[9,12], "Venus":[2,7], "Saturn":[10,11]}
     exalted = {"Sun":1, "Moon":2, "Mars":10, "Mercury":6, "Jupiter":4, "Venus":12, "Saturn":7}
     debilitated = {"Sun":7, "Moon":8, "Mars":4, "Mercury":12, "Jupiter":10, "Venus":6, "Saturn":1}
     friends = {"Sun":[4,1,8,9,12], "Moon":[5,3,6], "Mars":[5,4,9,12], "Mercury":[5,2,7], "Jupiter":[5,4,1,8], "Venus":[3,6,10,11], "Saturn":[3,6,2,7]}
     enemies = {"Sun":[2,7,10,11], "Moon":[], "Mars":[3,6], "Mercury":[4], "Jupiter":[3,6,2,7], "Venus":[5,4], "Saturn":[5,4,1,8]}
+    
     if s_id in own.get(planet, []): return "Own Sign"
     if exalted.get(planet) == s_id: return "Exalted"
     if debilitated.get(planet) == s_id: return "Debilitated"
@@ -199,21 +196,108 @@ def get_planet_status(planet, sign_name):
     if s_id in enemies.get(planet, []): return "Enemy"
     return "Neutral"
 
+# --- DETAILED INTERPRETATIONS ---
 def get_detailed_interpretations(asc_sign_name):
+    """Returns detailed text for Summary Tab based on Ascendant"""
     data = {
-        "Aries": { "Gen": "Dynamic, energetic, pioneering.", "Pers": "Courageous, impatient, leader.", "Phys": "Athletic, prominent features.", "Health": "Headaches, fevers.", "Career": "Military, sports.", "Rel": "Passionate, direct." },
-        "Taurus": { "Gen": "Stable, practical, grounded.", "Pers": "Reliable, stubborn.", "Phys": "Sturdy build.", "Health": "Throat issues.", "Career": "Finance, arts.", "Rel": "Loyal, sensual." },
-        "Gemini": { "Gen": "Intellectual, adaptable.", "Pers": "Witty, restless.", "Phys": "Slender, expressive.", "Health": "Nerves, lungs.", "Career": "Media, sales.", "Rel": "Fun, flirtatious." },
-        "Cancer": { "Gen": "Emotional, intuitive.", "Pers": "Nurturing, moody.", "Phys": "Round face, soft.", "Health": "Stomach.", "Career": "Nursing, home.", "Rel": "Devoted, protective." },
-        "Leo": { "Gen": "Regal, confident.", "Pers": "Generous, proud.", "Phys": "Broad shoulders.", "Health": "Heart, spine.", "Career": "Leadership, acting.", "Rel": "Romantic, loyal." },
-        "Virgo": { "Gen": "Analytical, practical.", "Pers": "Modest, critical.", "Phys": "Neat, youthful.", "Health": "Digestion.", "Career": "Data, service.", "Rel": "Practical, devoted." },
-        "Libra": { "Gen": "Diplomatic, balanced.", "Pers": "Charming, indecisive.", "Phys": "Attractive, balanced.", "Health": "Kidneys.", "Career": "Law, arts.", "Rel": "Romantic, partner-focused." },
-        "Scorpio": { "Gen": "Intense, secretive.", "Pers": "Determined, magnetic.", "Phys": "Piercing eyes.", "Health": "Reproductive.", "Career": "Research, occult.", "Rel": "Possessive, deep." },
-        "Sagittarius": { "Gen": "Optimistic, adventurous.", "Pers": "Honest, blunt.", "Phys": "Tall, athletic.", "Health": "Hips, liver.", "Career": "Teaching, travel.", "Rel": "Freedom-loving." },
-        "Capricorn": { "Gen": "Ambitious, disciplined.", "Pers": "Serious, patient.", "Phys": "Lean, bony.", "Health": "Knees, skin.", "Career": "Corporate, admin.", "Rel": "Cautious, loyal." },
-        "Aquarius": { "Gen": "Innovative, humanitarian.", "Pers": "Friendly, detached.", "Phys": "Unique features.", "Health": "Ankles, circulation.", "Career": "Tech, science.", "Rel": "Intellectual, free." },
-        "Pisces": { "Gen": "Spiritual, dreamy.", "Pers": "Compassionate, escapist.", "Phys": "Soft eyes.", "Health": "Feet.", "Career": "Creative, healing.", "Rel": "Soulful, giving." }
+        "Aries": {
+            "Gen": "As an Aries Ascendant, you are born under the sign of the Ram, ruled by Mars. This placement bestows upon you a dynamic, energetic, and pioneering spirit. You are a natural initiator who loves to start new projects.",
+            "Pers": "You possess a strong will and a direct approach to life. You are courageous, confident, and enthusiastic. However, you can also be impulsive and impatient. You value independence highly and often prefer to lead rather than follow.",
+            "Phys": "Physically, you tend to have a strong, athletic build with prominent features, often a distinct nose or eyebrows. You likely walk quickly and have an intense gaze. High energy levels are a hallmark of your constitution.",
+            "Health": "You are prone to issues related to the head, such as migraines, headaches, or fevers. Stress management is crucial for you. Regular exercise is not just good for your body but essential for venting your excess mental energy.",
+            "Career": "You thrive in competitive environments. Careers in the military, police, sports, engineering, or entrepreneurship suit you well. You need a role that offers autonomy and challenges rather than routine desk work.",
+            "Rel": "In relationships, you are passionate and direct. You enjoy the chase and are often the one to initiate interest. You need a partner who can match your energy but also has the patience to handle your occasional outbursts."
+        },
+        "Taurus": {
+            "Gen": "As a Taurus Ascendant, you are ruled by Venus, the planet of beauty and luxury. You are grounded, practical, and have a deep appreciation for the material comforts of life.",
+            "Pers": "You are reliable, patient, and persistent. Once you set your mind to something, you see it through. You can be quite stubborn and resistant to change, valuing stability above all else. You have a calming presence.",
+            "Phys": "You typically have a solid, sturdy build, often with a thick or prominent neck. Your eyes are likely large and expressive. You tend to move deliberately and gracefully, rarely rushing.",
+            "Health": "Your sensitive areas are the throat and neck. You may be prone to sore throats, thyroid issues, or tonsillitis. There is a tendency to gain weight due to a love for good food, so diet management is key.",
+            "Career": "You excel in fields requiring patience and resource management. Finance, banking, agriculture, music, arts, or the luxury goods industry are excellent fits. You build wealth steadily and securely.",
+            "Rel": "You are a loyal and sensual partner. You take your time falling in love, but once committed, you are in it for the long haul. You express love through physical touch and tangible gifts."
+        },
+        "Gemini": {
+            "Gen": "Ruled by Mercury, you are the communicator of the zodiac. You are intellectually curious, adaptable, and quick-witted. Variety is the spice of your life.",
+            "Pers": "You are sociable, charming, and love to gather information. However, your dual nature can make you indecisive or restless. You bore easily and need constant mental stimulation.",
+            "Phys": "You tend to have a tall, slender, and agile frame. Your arms and hands may be expressive when you speak. You often look younger than your actual age due to your lively energy.",
+            "Health": "You are prone to nervous system issues, anxiety, and respiratory problems like asthma. Your active mind can lead to insomnia, so learning to relax is vital.",
+            "Career": "Careers in communication, writing, journalism, sales, marketing, or IT suit you perfectly. You thrive in fast-paced environments where you can multitask and network.",
+            "Rel": "You need a partner who is intellectually stimulating. A meeting of the minds is more important to you than deep emotional displays. You can be flirtatious and fun-loving in relationships."
+        },
+        "Cancer": {
+            "Gen": "Ruled by the Moon, you are sensitive, intuitive, and deeply connected to your emotions. You have a strong attachment to home, family, and your roots.",
+            "Pers": "You are nurturing and protective of those you love. However, you can be moody and easily hurt by criticism. You have a hard shell but a very soft, caring heart inside.",
+            "Phys": "You generally have a round face with soft features and expressive eyes. You may have a tendency to carry weight in the midsection. Your appearance often radiates a gentle, approachable vibe.",
+            "Health": "Your stomach and digestive system are sensitive. Emotional stress often manifests as digestive upsets. You may also be prone to chest congestion or water retention.",
+            "Career": "You excel in caring professions like nursing, teaching, psychology, or human resources. Real estate, hospitality, and cooking are also natural fits for your nurturing talents.",
+            "Rel": "You seek emotional security above all else. You are a devoted partner who loves to 'mother' your significant other. You need a partner who values family and loyalty as much as you do."
+        },
+        "Leo": {
+            "Gen": "Ruled by the Sun, you are born to shine. You are confident, charismatic, and have a natural flair for leadership. You love being the center of attention.",
+            "Pers": "You are generous, warm-hearted, and loyal. However, you can also be arrogant or domineering if your ego goes unchecked. You have a strong sense of personal pride and dignity.",
+            "Phys": "You tend to have a broad upper body, strong shoulders, and a majestic gait. You may have a thick mane of hair. You have a commanding presence that draws people to you.",
+            "Health": "The heart and spine are your vulnerable areas. You may face issues with blood pressure or back pain. Regular cardiovascular exercise is essential for your well-being.",
+            "Career": "You belong in leadership roles or the public eye. Politics, entertainment, management, or government are ideal. You dislike taking orders and thrive where you can be the boss.",
+            "Rel": "You are a passionate and romantic partner. You treat your loved one like royalty but expect the same adoration in return. Loyalty is non-negotiable for you."
+        },
+        "Virgo": {
+            "Gen": "Ruled by Mercury, you are the perfectionist of the zodiac. You are analytical, practical, and have a keen eye for detail. You love to be of service.",
+            "Pers": "You are modest, intelligent, and hardworking. You can be critical of yourself and others, striving for perfection. You are the person who notices the details everyone else misses.",
+            "Phys": "You typically have a slender, neat, and youthful appearance. Your features are often sharp or delicate. You usually pay great attention to hygiene and dress.",
+            "Health": "Your digestive system and intestines are sensitive. Nervous tension often affects your stomach. A clean, balanced diet is critical for your health.",
+            "Career": "You excel in jobs requiring precision and analysis. Accounting, data analysis, medicine, editing, or coding are perfect. You are the troubleshooter who fixes systems.",
+            "Rel": "You are a practical and devoted partner. You show love through acts of service rather than grand romantic gestures. You seek an intelligent, tidy, and reliable mate."
+        },
+        "Libra": {
+            "Gen": "Ruled by Venus, you are the diplomat. You value harmony, balance, and justice. You are charming, social, and dislike conflict of any kind.",
+            "Pers": "You are refined and artistic. However, your desire to please everyone can make you indecisive. You thrive in partnerships and hate being alone.",
+            "Phys": "You are often blessed with a well-proportioned body and pleasing features, perhaps a beautiful smile or dimples. You tend to age well and maintain a youthful charm.",
+            "Health": "The kidneys and lower back are your vulnerable areas. You should drink plenty of water. Balance is key for you—avoiding excess in food or drink is important.",
+            "Career": "You excel in fields involving negotiation, aesthetics, or law. Diplomacy, fashion design, interior decorating, or counseling are great fits. You work best in a team.",
+            "Rel": "Relationships are central to your life. You are a romantic and accommodating partner. You need a relationship that is harmonious and aesthetically pleasing."
+        },
+        "Scorpio": {
+            "Gen": "Ruled by Mars and Ketu, you are intense, magnetic, and secretive. You possess incredible willpower and emotional depth. You see beneath the surface.",
+            "Pers": "You are determined and resilient. While fiercely loyal, you can be vindictive if betrayed. You are a private person who keeps your true feelings hidden.",
+            "Phys": "You have a strong, sturdy build with a powerful presence. Your eyes are often piercing and hypnotic. You exude a mysterious charisma.",
+            "Health": "Your reproductive system and excretory organs are sensitive. You may be prone to hidden ailments. Finding a healthy outlet for your intense emotions is vital.",
+            "Career": "You thrive in research, investigation, or crisis management. Surgery, detective work, psychology, or the occult are ideal. You have the focus to solve deep mysteries.",
+            "Rel": "Love is an all-or-nothing experience for you. You crave deep soul-intimacy. You are possessive and protective, expecting absolute fidelity from your partner."
+        },
+        "Sagittarius": {
+            "Gen": "Ruled by Jupiter, you are the eternal optimist. You are adventurous, philosophical, and love freedom. You seek the higher meaning of life.",
+            "Pers": "You are honest, straightforward, and enthusiastic. However, you can be blunt or tactless. You dislike restrictions and need plenty of space to explore.",
+            "Phys": "You are likely to be tall and athletic. You have a jovial, open expression and a confident stride. You may have a high forehead.",
+            "Health": "The hips, thighs, and liver are your vulnerable areas. You may be prone to sciatica or weight gain due to overindulgence. Moderation is key for you.",
+            "Career": "You excel in teaching, publishing, religion, law, or travel. You need a career that offers freedom and a sense of purpose. You dislike micromanagement.",
+            "Rel": "You need a partner who is also your best friend and travel companion. You value freedom in relationships and dislike clinginess. You seek a partner who shares your philosophy."
+        },
+        "Capricorn": {
+            "Gen": "Ruled by Saturn, you are ambitious, disciplined, and practical. You play the long game and are willing to work hard for success.",
+            "Pers": "You are responsible, serious, and cautious. You value tradition and structure. You can be pessimistic but have a dry sense of humor. You command respect.",
+            "Phys": "You tend to have a lean, wiry build. Your features may be prominent or bony. You often look mature for your age when young, but age gracefully later.",
+            "Health": "Your knees, joints, bones, and skin are sensitive. You may suffer from arthritis or dry skin. You need to ensure you get enough calcium and keep moving.",
+            "Career": "You are built for the corporate world and administration. Management, government, construction, or mining are suitable. You climb the ladder of success steadily.",
+            "Rel": "You take relationships seriously. You are cautious in love but incredibly loyal and reliable once committed. You seek a partner who is responsible and ambitious."
+        },
+        "Aquarius": {
+            "Gen": "Ruled by Saturn and Rahu, you are the innovator. You are unconventional, humanitarian, and intellectual. You march to the beat of your own drum.",
+            "Pers": "You are friendly but detached. You value your freedom and individuality above all. You are often ahead of your time and love to break traditions.",
+            "Phys": "You often have a unique or unusual appearance. You may be tall with striking features. There is often something 'electric' about your vibe.",
+            "Health": "The ankles, calves, and circulatory system are your weak points. You may be prone to sprains or varicose veins. Keeping your circulation moving is important.",
+            "Career": "You excel in technology, science, or social change. IT, aviation, astrology, or scientific research are excellent. You work best in groups or organizations.",
+            "Rel": "You need a partner who respects your freedom. You are attracted to intelligence and uniqueness. You can be aloof, so friendship is the best foundation for your romance."
+        },
+        "Pisces": {
+            "Gen": "Ruled by Jupiter, you are the dreamer. You are compassionate, imaginative, and deeply spiritual. You feel the emotions of others.",
+            "Pers": "You are kind, adaptable, and intuitive. However, you can be impractical or escapist. You often sacrifice your own needs for the sake of others.",
+            "Phys": "You tend to have a soft, gentle appearance with dreamy, watery eyes. You may have smaller feet or hands. Your demeanor is usually calm.",
+            "Health": "Your feet and lymphatic system are sensitive. You may be prone to swelling or water retention. You are sensitive to drugs and alcohol.",
+            "Career": "You thrive in creative or healing professions. Music, film, photography, nursing, counseling, or spirituality are ideal. You need a career that uses your empathy.",
+            "Rel": "You are a hopeless romantic seeking a soulmate. You are incredibly giving and forgiving in love. You need a partner who grounds you without crushing your dreams."
+        }
     }
+    # Default to Aries if unknown, but code logic ensures valid sign name
     return data.get(asc_sign_name, data["Aries"])
 
 def get_planet_positions(jd, lat, lon, birth_dt, lang):
@@ -233,7 +317,7 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
             pos = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)[0][0]
         raw_bodies[name] = pos
 
-    # VARGAS
+    # --- VARGA CALCULATION ---
     varga_list = [1, 2, 3, 4, 7, 9, 10, 12, 16, 20, 24, 27, 30, 40, 45, 60]
     charts_data = {}
     
@@ -274,6 +358,7 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
         nak_name = nak_list[int(p_deg / (360/27)) % 27]
         house_d1 = ((int(p_deg/30) - int(raw_bodies["Ascendant"]/30)) % 12) + 1
         
+        # RESTORED: Status Calculation
         status = get_planet_status(p_name, sign_name)
         
         planet_details.append({
@@ -304,29 +389,16 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
     ]
 
     moon_pos = raw_bodies["Moon"]
-    is_mangalik = "Yes" if planet_details[2]['House'] in [1,4,7,8,12] else "No" 
+    is_mangalik = "Yes" if planet_details[2]['House'] in [1,4,7,8,12] else "No" # Mars is index 2
     
-    nak_deg = moon_pos % (360/27)
-    charan = int(nak_deg / (360/27/4)) + 1
-    
-    # Calculate Paya (Footing)
-    moon_house = ((int(moon_pos/30) - int(raw_bodies["Ascendant"]/30)) % 12) + 1
-    if moon_house in [1, 6, 11]: paya = "Gold (Swarna)"
-    elif moon_house in [2, 5, 9]: paya = "Silver (Rajat)"
-    elif moon_house in [3, 7, 10]: paya = "Copper (Tamra)"
-    else: paya = "Iron (Loha)"
-
     summary = {
         "Lagna": zodiac_list[int(raw_bodies["Ascendant"]/30) % 12],
         "Rashi": zodiac_list[int(moon_pos/30) % 12],
         "Nakshatra": nak_list[int(moon_pos / (360/27)) % 27],
-        "Charan": charan,
         "Mangalik": is_mangalik,
-        "Paya": paya,
         "Asc_Sign_ID": int(raw_bodies["Ascendant"] // 30) + 1,
         **calculate_panchang(jd, lat, lon, birth_dt, moon_pos),
-        **get_detailed_interpretations(zodiac_list[int(raw_bodies["Ascendant"]/30) % 12]),
-        **get_nakshatra_properties(nak_list[int(moon_pos / (360/27)) % 27], zodiac_list[int(moon_pos/30) % 12], charan)
+        **get_detailed_interpretations(zodiac_list[int(raw_bodies["Ascendant"]/30) % 12]) # Fetch detailed text
     }
 
     return charts_data, planet_details, kp_planets, kp_cusps, ruling_planets, summary, raw_bodies
@@ -369,15 +441,52 @@ def draw_chart(house_planets, asc_sign, style="North", title="Chart"):
             ax.text(x, y, txt_p, fontsize=6, fontweight='bold', ha='center', va='center')
     return fig
 
+# --- DASHA ENGINE ---
+def calculate_vimshottari_structure(jd, birth_date):
+    moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
+    nak_deg = (moon_pos * (27/360)) 
+    nak_idx = int(nak_deg)
+    balance_prop = 1 - (nak_deg - nak_idx)
+    lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
+    years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
+    start_lord_idx = nak_idx % 9
+    dashas = []
+    curr_date = birth_date
+    first_dur = years[start_lord_idx] * balance_prop
+    dashas.append({"Lord": lords[start_lord_idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=first_dur*365.25), "FullYears": years[start_lord_idx]})
+    curr_date = dashas[0]['End']
+    for i in range(1, 9):
+        idx = (start_lord_idx + i) % 9
+        dur = years[idx]
+        dashas.append({"Lord": lords[idx], "Start": curr_date, "End": curr_date + datetime.timedelta(days=dur*365.25), "FullYears": dur})
+        curr_date = dashas[-1]['End']
+    return dashas
+
+def get_sub_periods(lord_name, start_date, level_years):
+    lords = ["Ketu", "Venus", "Sun", "Moon", "Mars", "Rahu", "Jupiter", "Saturn", "Mercury"]
+    years = [7, 20, 6, 10, 7, 18, 16, 19, 17]
+    try: start_idx = lords.index(lord_name)
+    except: return []
+    subs = []
+    curr = start_date
+    for i in range(9):
+        idx = (start_idx + i) % 9
+        sub_lord = lords[idx]
+        sub_years = years[idx]
+        duration_years = (level_years * sub_years) / 120
+        end_date = curr + datetime.timedelta(days=duration_years*365.25)
+        subs.append({"Lord": sub_lord, "Start": curr, "End": end_date, "Duration": duration_years, "FullYears": sub_years})
+        curr = end_date
+    return subs
+
 # --- 5. SIDEBAR ---
 with st.sidebar:
     st.title("☸️ TaraVaani")
     lang_opt = st.selectbox("Language (AI Only)", ["English", "Hindi", "Bengali", "Marathi", "Tamil", "Telugu", "Kannada", "Gujarati", "Malayalam"])
-    
     st.header("Create Profile")
-    n_in = st.text_input("Name", "") 
+    n_in = st.text_input("Name", "Suman Naskar")
     g_in = st.selectbox("Gender", ["Male", "Female"])
-    d_in = st.date_input("Date of Birth", value=datetime.date(2000, 1, 1), min_value=datetime.date(1900, 1, 1), format="DD/MM/YYYY")
+    d_in = st.date_input("Date of Birth", value=datetime.date(1993, 4, 23))
     c1, c2 = st.columns(2)
     hr_in = c1.selectbox("Hour", range(24), index=15)
     mn_in = c2.selectbox("Min", range(60), index=45)
@@ -410,53 +519,23 @@ with st.sidebar:
 if st.session_state.current_data:
     d = st.session_state.current_data
     
-    if 'Charts' not in d or 'Paya' not in d['Summary']: 
+    # Safety Check
+    if 'Charts' not in d or 'Gen' not in d['Summary']: 
         st.warning("⚠️ Upgrade Applied. Click 'Generate Kundali' again.")
         st.stop()
     
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📝 Summary", "🔮 Kundalis", "⭐ KP System", "📊 Charts (19)", "🗓️ Dashas", "🤖 AI Prediction"])
     
-    # 1. SUMMARY (NEW LAYOUT)
+    # 1. SUMMARY
     with tab1:
         st.markdown(f'<div class="header-box">{d["Name"]} 🙏</div>', unsafe_allow_html=True)
         c1, c2 = st.columns(2)
+        c1.write(f"**Lagna:** {d['Summary']['Lagna']}")
+        c2.write(f"**Rashi:** {d['Summary']['Rashi']}")
         
-        with c1:
-            st.subheader("Basic Details")
-            st.write(f"**Name:** {d['Name']}")
-            st.write(f"**Date:** {d['BirthDate'].strftime('%d %B %Y')}")
-            st.write(f"**Place:** {city_in}")
-            st.write(f"**Sunrise:** {d['Summary']['Sunrise']}")
-            st.write(f"**Sunset:** {d['Summary']['Sunset']}")
-            st.write(f"**Ayanamsa:** {d['Summary']['Ayanamsa']}")
-            
-        with c2:
-            st.subheader("Avakahada (Astrological Details)")
-            st.write(f"**Varna:** {d['Summary']['Varna']}")
-            st.write(f"**Vashya:** {d['Summary']['Vashya']}")
-            st.write(f"**Yoni:** {d['Summary']['Yoni']}")
-            st.write(f"**Gan:** {d['Summary']['Gana']}")
-            st.write(f"**Nadi:** {d['Summary']['Nadi']}")
-            st.write(f"**Sign:** {d['Summary']['Rashi']}")
-            st.write(f"**Sign Lord:** {d['Summary']['SignLord']}")
-            st.write(f"**Nakshatra-Charan:** {d['Summary']['Nakshatra']} ({d['Summary']['Charan']})")
-
-        st.divider()
-        st.subheader("Panchang Details")
-        pc1, pc2, pc3 = st.columns(3)
-        with pc1:
-            st.write(f"**Tithi:** {d['Summary']['Tithi']}")
-            st.write(f"**Karan:** {d['Summary']['Karan']}")
-            st.write(f"**Yog:** {d['Summary']['Yoga']}")
-        with pc2:
-            st.write(f"**Yunja:** {d['Summary']['Nadi']}")
-            st.write(f"**Tatva:** {d['Summary']['Tatva']}")
-            st.write(f"**Paya:** {d['Summary']['Paya']}")
-        with pc3:
-            st.write(f"**Name Alphabet:** {d['Summary']['NameAlpha']}")
-
         st.divider()
         st.subheader("Your Vedic Profile")
+        
         st.markdown(f"**General:**\n{d['Summary']['Gen']}")
         st.markdown(f"**Personality:**\n{d['Summary']['Pers']}")
         st.markdown(f"**Physical Appearance:**\n{d['Summary']['Phys']}")

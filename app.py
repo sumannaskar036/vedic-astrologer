@@ -106,26 +106,15 @@ def calculate_panchang(jd, lat, lon, birth_dt):
 
 def get_navamsa_pos(deg):
     """Calculates Navamsa Sign from Degree"""
-    # Each Navamsa is 3deg 20min (3.333 deg)
-    # Navamsa signs repeat: Aries, Tau... Pis, Aries...
-    # But correct calculation depends on the sign element.
-    # Simplified Logic:
-    
-    abs_deg = deg # 0-360
-    sign_idx = int(abs_deg / 30) # 0-11
+    abs_deg = deg 
+    sign_idx = int(abs_deg / 30) 
     deg_in_sign = abs_deg % 30
+    nav_num = int(deg_in_sign / (30/9)) 
     
-    nav_num = int(deg_in_sign / (30/9)) # 0-8 (9 parts)
-    
-    # 1, 5, 9 (Fire) starts Aries (0)
-    # 2, 6, 10 (Earth) starts Capricorn (9)
-    # 3, 7, 11 (Air) starts Libra (6)
-    # 4, 8, 12 (Water) starts Cancer (3)
-    
-    moveable = [0, 4, 8] # Ar, Leo, Sag (Start 0)
-    fixed = [1, 5, 9]    # Ta, Vir, Cap (Start 9 - Capricorn is index 9)
-    dual = [2, 6, 10]    # Ge, Lib, Aq (Start 6 - Libra is index 6)
-    water = [3, 7, 11]   # Cn, Sc, Pi (Start 3 - Cancer is index 3)
+    moveable = [0, 4, 8] # Ar, Leo, Sag
+    fixed = [1, 5, 9]    # Ta, Vir, Cap
+    dual = [2, 6, 10]    # Ge, Lib, Aq
+    water = [3, 7, 11]   # Cn, Sc, Pi 
     
     if sign_idx in moveable: base = 0
     elif sign_idx in fixed: base = 9
@@ -133,14 +122,66 @@ def get_navamsa_pos(deg):
     else: base = 3
     
     nav_sign_idx = (base + nav_num) % 12
-    return nav_sign_idx + 1 # 1-12
+    return nav_sign_idx + 1
+
+def get_planet_status(planet, sign_name):
+    """Determines planet status (Own, Exalted, Debilitated, Friendly, Enemy)"""
+    
+    # Sign mapping
+    sign_map = {"Aries":1, "Taurus":2, "Gemini":3, "Cancer":4, "Leo":5, "Virgo":6, "Libra":7, "Scorpio":8, "Sagittarius":9, "Capricorn":10, "Aquarius":11, "Pisces":12}
+    s_id = sign_map.get(sign_name, 0)
+    
+    if planet == "Ascendant" or planet == "Uranus" or planet == "Neptune" or planet == "Pluto": return "--"
+    
+    # 1. Own Sign
+    own = {"Sun":[5], "Moon":[4], "Mars":[1,8], "Merc":[3,6], "Jup":[9,12], "Ven":[2,7], "Sat":[10,11], "Rahu":[], "Ketu":[]}
+    if s_id in own.get(planet, []): return "Own Sign"
+    
+    # 2. Exalted
+    exalted = {"Sun":1, "Moon":2, "Mars":10, "Merc":6, "Jup":4, "Ven":12, "Sat":7, "Rahu":2, "Ketu":8}
+    if exalted.get(planet) == s_id: return "Exalted"
+    
+    # 3. Debilitated (Opposite of Exalted)
+    debilitated = {"Sun":7, "Moon":8, "Mars":4, "Merc":12, "Jup":10, "Ven":6, "Sat":1, "Rahu":8, "Ketu":2}
+    if debilitated.get(planet) == s_id: return "Debilitated"
+    
+    # 4. Friends (Natural) - Simplified
+    friends = {
+        "Sun": [4, 1, 8, 9, 12], # Moon, Mars, Jup
+        "Moon": [5, 3, 6], # Sun, Merc
+        "Mars": [5, 4, 9, 12], # Sun, Moon, Jup
+        "Merc": [5, 2, 7], # Sun, Ven
+        "Jup": [5, 4, 1, 8], # Sun, Moon, Mars
+        "Ven": [3, 6, 10, 11], # Merc, Sat
+        "Sat": [3, 6, 2, 7], # Merc, Ven
+        "Rahu": [3, 6, 2, 7, 10, 11], 
+        "Ketu": [1, 8, 9, 12]
+    }
+    
+    if s_id in friends.get(planet, []): return "Friendly"
+    
+    # 5. Enemies (Natural) - Simplified
+    enemies = {
+        "Sun": [2, 7, 10, 11], # Ven, Sat
+        "Moon": [], # No enemies
+        "Mars": [3, 6], # Merc
+        "Merc": [4], # Moon
+        "Jup": [3, 6, 2, 7], # Merc, Ven
+        "Ven": [5, 4], # Sun, Moon
+        "Sat": [5, 4, 1, 8], # Sun, Moon, Mars
+        "Rahu": [5, 4, 1],
+        "Ketu": [5, 4]
+    }
+    if s_id in enemies.get(planet, []): return "Enemy"
+    
+    return "Neutral"
 
 def get_planet_positions(jd, lat, lon, birth_dt):
     ayanamsa = swe.get_ayanamsa_ut(jd)
     cusps, ascmc = swe.houses(jd, lat, lon, b'P') 
     asc_deg = (ascmc[0] - ayanamsa) % 360
     asc_sign = int(asc_deg // 30) + 1 
-    asc_nav = get_navamsa_pos(asc_deg) # Navamsa of Lagna
+    asc_nav = get_navamsa_pos(asc_deg)
 
     planet_map = {0:"Sun", 1:"Moon", 4:"Mars", 2:"Merc", 5:"Jup", 3:"Ven", 6:"Sat", 11:"Rahu", 10:"Ketu"}
     
@@ -153,12 +194,13 @@ def get_planet_positions(jd, lat, lon, birth_dt):
     zodiac_list = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"]
     sign_lords = ["Mars","Venus","Mercury","Moon","Sun","Mercury","Venus","Mars","Jupiter","Saturn","Saturn","Jupiter"]
 
-    # Calculate Planets
+    mars_house = 0 # To track Mangalik
+
     for pid, name in planet_map.items():
         if name == "Ketu":
             rahu_pos = swe.calc_ut(jd, 11, swe.FLG_SIDEREAL)[0][0]
             pos = (rahu_pos + 180) % 360
-            speed = 0 # Placeholder
+            speed = 0
         else:
             calc = swe.calc_ut(jd, pid, swe.FLG_SIDEREAL)
             pos = calc[0][0]
@@ -167,48 +209,51 @@ def get_planet_positions(jd, lat, lon, birth_dt):
         sign = int(pos // 30) + 1 
         deg = pos % 30
         
-        # D1 House
         house_d1 = ((sign - asc_sign) % 12) + 1
         house_planets_d1[house_d1].append(name)
         
-        # D9 Calculation
+        # Track Mars for Mangalik
+        if name == "Mars":
+            mars_house = house_d1
+        
         nav_sign = get_navamsa_pos(pos)
         house_d9 = ((nav_sign - asc_nav) % 12) + 1
         house_planets_d9[house_d9].append(name)
         
-        # Details
         nak_idx = int(pos / (360/27)) % 27
         nak_name = nak_list[nak_idx]
         nak_lord = nak_lords[nak_idx]
         sign_name = zodiac_list[sign-1]
         sign_lord = sign_lords[sign-1]
         
-        nak_deg = pos % (360/27)
-        charan = int(nak_deg / (360/27/4)) + 1
-        
         is_retro = "Retro" if speed < 0 else "Direct"
+        status = get_planet_status(name, sign_name)
         
         planet_details.append({
             "Planet": name, "Sign": sign_name, "Sign Lord": sign_lord, 
             "Nakshatra": nak_name, "Naksh Lord": nak_lord, "Degree": f"{int(deg)}°{int((deg%1)*60)}'",
-            "Retro": is_retro, "House": house_d1
+            "Retro": is_retro, "House": house_d1, "Status": status
         })
 
     l_sign_name = zodiac_list[asc_sign-1]
     
-    # Lagna Row in Table
     planet_details.insert(0, {
         "Planet": "Ascendant", "Sign": l_sign_name, "Sign Lord": sign_lords[asc_sign-1],
         "Nakshatra": nak_list[int(asc_deg/(360/27)%27)], "Naksh Lord": nak_lords[int(asc_deg/(360/27)%27)],
-        "Degree": f"{int(asc_deg%30)}°{int((asc_deg%30%1)*60)}'", "Retro": "--", "House": 1
+        "Degree": f"{int(asc_deg%30)}°{int((asc_deg%30%1)*60)}'", "Retro": "--", "House": 1, "Status": "--"
     })
 
     moon_data = next((p for p in planet_details if p['Planet']=='Moon'), None)
+    
+    # Mangalik Check (Mars in 1, 4, 7, 8, 12 from Lagna)
+    is_mangalik = "Yes" if mars_house in [1, 4, 7, 8, 12] else "No"
+    
     summary = {
         "Lagna": l_sign_name,
         "Rashi": moon_data['Sign'] if moon_data else "Unknown",
         "Nakshatra": moon_data['Nakshatra'] if moon_data else "Unknown",
-        "Charan": 1, # Simplified
+        "Charan": 1, 
+        "Mangalik": is_mangalik,
         **calculate_panchang(jd, lat, lon, birth_dt),
         **get_nakshatra_properties(moon_data['Nakshatra'], moon_data['Sign']),
         "Asc_Sign_ID": asc_sign 
@@ -224,7 +269,6 @@ def draw_chart(house_planets, asc_sign, style="North", title="Lagna Chart"):
     ax.set_title(title, fontsize=10, fontweight='bold', pad=10)
     
     if style == "North":
-        # Diamond Layout
         ax.plot([0, 1], [1, 0], 'k-', lw=1.5)
         ax.plot([0, 1], [0, 1], 'k-', lw=1.5)
         ax.plot([0, 0.5], [0.5, 0], 'k-', lw=1.5)
@@ -233,43 +277,26 @@ def draw_chart(house_planets, asc_sign, style="North", title="Lagna Chart"):
         ax.plot([0, 0.5], [0.5, 1], 'k-', lw=1.5)
         rect = patches.Rectangle((0, 0), 1, 1, linewidth=1.5, edgecolor='black', facecolor='none')
         ax.add_patch(rect)
-        
-        # Centers for 12 Houses
         pos = {1: (0.5, 0.8), 2: (0.25, 0.85), 3: (0.15, 0.75), 4: (0.2, 0.5), 5: (0.15, 0.25), 6: (0.25, 0.15), 7: (0.5, 0.2), 8: (0.75, 0.15), 9: (0.85, 0.25), 10: (0.8, 0.5), 11: (0.85, 0.75), 12: (0.75, 0.85)}
-        
         for h, (x, y) in pos.items():
             sign_num = ((asc_sign + h - 2) % 12) + 1
             ax.text(x, y-0.08, str(sign_num), fontsize=8, color='red', ha='center')
             if house_planets[h]:
                 ax.text(x, y, "\n".join(house_planets[h]), fontsize=7, fontweight='bold', ha='center', va='center')
-
     else:
-        # South Square Layout
         for i in [0, 0.25, 0.5, 0.75, 1]:
             ax.plot([0, 1], [i, i], 'k-', lw=1)
             ax.plot([i, i], [0, 1], 'k-', lw=1)
         rect = patches.Rectangle((0.25, 0.25), 0.5, 0.5, color='white', zorder=10)
         ax.add_patch(rect)
         ax.text(0.5, 0.5, "Rashi", ha='center', va='center', fontsize=10, fontweight='bold', zorder=11)
-        
-        # South Map: Sign Fixed positions
-        # 1=Ar(0.37,0.87), 2=Ta(0.62,0.87)...
         sign_pos = {1: (0.37, 0.87), 2: (0.62, 0.87), 3: (0.87, 0.87), 4: (0.87, 0.62), 5: (0.87, 0.37), 6: (0.87, 0.12), 7: (0.62, 0.12), 8: (0.37, 0.12), 9: (0.12, 0.12), 10: (0.12, 0.37), 11: (0.12, 0.62), 12: (0.12, 0.87)}
-        
-        # We need to map Planets to SIGNS, not houses for South Chart drawing
-        # But our input 'house_planets' is house-based. 
-        # We need to reverse calculate or just use the signs from details.
-        # For simplicity in this function, we assume input is House Planets relative to Asc.
-        # Ideally, we pass planet_details for South Chart. 
-        # Making a quick mapping for display:
-        
         for h, planets in house_planets.items():
             sign = ((asc_sign + h - 2) % 12) + 1
             x, y = sign_pos[sign]
             txt = "\n".join(planets)
             if h == 1: txt += "\n(Asc)"
             ax.text(x, y, txt, fontsize=7, fontweight='bold', ha='center', va='center')
-
     return fig
 
 # --- DASHA ENGINE ---
@@ -377,22 +404,20 @@ if st.session_state.current_data:
             st.subheader("Panchang & Avakahada")
             st.write(f"**Lagna:** {d['Summary']['Lagna']}")
             st.write(f"**Rashi:** {d['Summary']['Rashi']}")
-            st.write(f"**Sign Lord:** {d['Summary']['SignLord']}")
             st.write(f"**Nakshatra:** {d['Summary']['Nakshatra']} (Pada {d['Summary']['Charan']})")
+            st.write(f"**Mangalik:** {d['Summary']['Mangalik']}")  # Added
             st.write(f"**Varna:** {d['Summary']['Varna']}")
             st.write(f"**Yoni:** {d['Summary']['Yoni']}")
             st.write(f"**Gana:** {d['Summary']['Gana']}")
             st.write(f"**Nadi:** {d['Summary']['Nadi']}")
+            st.write(f"**Tithi:** {d['Summary']['Tithi']}")
             st.write(f"**Yoga:** {d['Summary']['Yoga']}")
     
-    # 2. KUNDALIS TAB (New Chart UI)
+    # 2. KUNDALIS TAB
     with tab2:
         c_type = st.selectbox("Chart Style:", ["North Indian", "South Indian"])
-        
-        # Dual Charts (Side-by-Side)
         c1, c2 = st.columns(2)
         style_code = "North" if "North" in c_type else "South"
-        
         with c1:
             fig1 = draw_chart(d['House_Planets_D1'], d['Asc_Sign_D1'], style_code, "Lagna Chart (D1)")
             st.pyplot(fig1)
@@ -402,19 +427,15 @@ if st.session_state.current_data:
             
         st.divider()
         st.subheader("Planetary Details")
-        
-        # Detailed Planet Table
         df = pd.DataFrame(d['Planet_Details'])
         st.dataframe(df, use_container_width=True, hide_index=True)
-        
         st.divider()
-        st.caption("Chart Interpretations can be asked in the AI tab.")
+        st.caption("Ask the AI about your chart analysis in the next tab.")
 
-    # 3. DASHA TAB (Cascading)
+    # 3. DASHA TAB
     with tab3:
         st.markdown("### Vimshottari Dasha Analysis")
         md_list = calculate_vimshottari_structure(d['JD'], d['BirthDate'])
-        
         md_data = [{"Lord": m['Lord'], "Start": m['Start'].strftime('%d-%b-%Y'), "End": m['End'].strftime('%d-%b-%Y'), "Duration": f"{m['FullYears']} Yrs"} for m in md_list]
         st.dataframe(pd.DataFrame(md_data), use_container_width=True)
         
@@ -442,7 +463,6 @@ if st.session_state.current_data:
     with tab4:
         st.subheader(f"Ask TaraVaani ({lang_opt})")
         q_topic = st.selectbox("Topic", ["General Life", "Career", "Marriage", "Health", "Wealth"])
-        
         if st.button("✨ Get Prediction"):
             prompt = f"""
             Act as Vedic Astrologer TaraVaani.

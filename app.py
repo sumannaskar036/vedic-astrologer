@@ -434,7 +434,7 @@ if st.session_state.current_data:
         
         # --- PLANETARY STATUS REFERENCE ---
         st.divider()
-        st.subheader("📌 Planetary Status Guide")
+        st.subheader("Planetary Status Guide")
         
         with st.expander("What do these statuses mean?", expanded=True):
             st.markdown("""

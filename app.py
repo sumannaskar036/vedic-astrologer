@@ -752,7 +752,7 @@ if st.session_state.current_data:
             with st.spinner("Consulting stars..."):
                 try:
                     # 1. Authenticate with the NEW key and FORCE the REST transport
-                    genai.configure(api_key=st.secrets["AIzaSyCGKnqqGkSoC44Mr1VK_L8N5wfjFS4hcGM"], transport='rest')
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
                     
                     # 2. Use the 'models/' prefix to force the Stable API
                     model = genai.GenerativeModel('models/gemini-1.5-flash')

@@ -755,7 +755,7 @@ if st.session_state.current_data:
                     genai.configure(api_key=st.secrets["GEMINI_API_KEY"], transport='rest')
                     
                     # 2. Use the 'models/' prefix to force the Stable API
-                    model = genai.GenerativeModel('models/gemini-1.5-flash')
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     
                     # 3. Generate with safety settings
                     response = model.generate_content(prompt, safety_settings=safety_settings)

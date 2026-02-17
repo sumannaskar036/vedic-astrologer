@@ -738,35 +738,46 @@ if st.session_state.current_data:
         q_topic = st.selectbox("Topic", ["General Life", "Career", "Marriage", "Health", "Wealth"])
         
         if st.button("✨ Get Prediction"):
-            # Define Safety Settings to prevent "Silent" blocking
-            safety_settings = [
-                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            ]
-            
-            # Use a more detailed prompt
+            # Prepare the prompt
             prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']} ({d['Gender']}). Planetary Positions: {str(d['Planet_Details'])}. Question: Predict about {q_topic} in {lang_opt}. Style: Mystic, positive."
             
             with st.spinner("Consulting stars..."):
                 try:
-                    # 1. Authenticate with the NEW key and FORCE the REST transport
-                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    import requests
                     
-                    # 2. Use the 'models/' prefix to force the Stable API
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # 1. DIRECT API CALL (Bypasses the library issues completely)
+                    # This URL forces the use of the cheap 'gemini-1.5-flash' model
+                    api_key = st.secrets["GEMINI_API_KEY"]
+                    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
                     
-                    # 3. Generate with safety settings
-                    response = model.generate_content(prompt, safety_settings=safety_settings)
+                    # 2. Construct the Payload manually
+                    payload = {
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "safetySettings": [
+                            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+                        ]
+                    }
                     
-                    if response.text:
-                        st.info(response.text)
+                    # 3. Send the request
+                    response = requests.post(url, json=payload, headers={"Content-Type": "application/json"})
+                    
+                    # 4. Handle the response
+                    if response.status_code == 200:
+                        result = response.json()
+                        try:
+                            # Extract the text safely
+                            text = result['candidates'][0]['content']['parts'][0]['text']
+                            st.info(text)
+                        except (KeyError, IndexError):
+                            st.error("The stars are silent (No text returned). Please try again.")
                     else:
-                        st.error(f"Blocked. Reason: {response.prompt_feedback}")
+                        st.error(f"Google API Error: {response.text}")
+                        
                 except Exception as e:
-                    # Show the REAL error
-                    st.error(f"Technical Error: {e}")
+                    st.error(f"Connection Error: {e}")
         
 else:
     st.title("🔮 TaraVaani")

@@ -531,7 +531,11 @@ with st.sidebar:
     if st.button("Generate Kundali", type="primary"):
         with st.spinner("Calculating 19 Charts..."):
             try:
-                res = geocoder.geocode(city_in)
+                if geocoder:
+                    res = geocoder.geocode(city_in)
+                else:
+                    st.error("⚠️ OpenCage API Key is missing! Cannot find city.")
+                    st.stop()
                 if res:
                     lat, lng = res[0]['geometry']['lat'], res[0]['geometry']['lng']
                     birth_dt = datetime.datetime.combine(d_in, datetime.time(hr_in, mn_in))
@@ -738,7 +742,7 @@ if st.session_state.current_data:
         if st.button("✨ Get Prediction"):
             prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']} ({d['Gender']}). Planetary Positions: {str(d['Planet_Details'])}. Question: Predict about {q_topic}. Start with 'Radhe Radhe 🙏'. Answer in {lang_opt}."
             try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
+                model = genai.GenerativeModel('gemini-2.0-flash')
                 response = model.generate_content(prompt)
                 st.info(response.text)
             except Exception as e:

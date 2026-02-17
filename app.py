@@ -736,41 +736,93 @@ if st.session_state.current_data:
         st.dataframe(pd.DataFrame(dd_data), use_container_width=True)
 
     # 6. AI
+    # 6. AI Prediction & Chat
     with tab6:
         st.subheader(f"Ask TaraVaani ({lang_opt})")
-        q_topic = st.selectbox("Topic", ["General Life", "Career", "Marriage", "Health", "Wealth"])
         
-        if st.button("✨ Get Prediction"):
-            # Prepare the prompt
-            prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']} ({d['Gender']}). Planetary Positions: {str(d['Planet_Details'])}. Question: Predict about {q_topic}. Start with 'Radhe Radhe 🙏'. Answer in {lang_opt}."
+        # --- 1. TOPIC SELECTOR & BUTTON ---
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            q_topic = st.selectbox("Choose a Topic to Start:", ["General Life", "Career", "Marriage", "Health", "Wealth", "Spiritual Growth"])
+        with c2:
+            st.write("") # Spacer
+            st.write("")
+            start_btn = st.button("✨ Get Prediction", type="primary")
+
+        # --- 2. INITIALIZE CHAT HISTORY ---
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
+
+        # --- 3. HELPER: SYSTEM CONTEXT (Crucial for Memory) ---
+        # We build this string so the AI remembers the chart for every single message.
+        system_context = f"""
+        You are TaraVaani, a compassionate Vedic Astrologer.
+        User: {d['Name']} ({d['Gender']}).
+        Birth: {d['BirthDate']} in {city_in}.
+        Chart Summary: {d['Summary']}.
+        Planetary Positions: {str(d['Planet_Details'])}.
+        Current Dasha: Check the user's current Vimshottari Dasha context if needed.
+        Language: {lang_opt}.
+        Tone: Mystic, positive, but realistic. Use "Radhe Radhe" only for the first greeting.
+        """
+
+        # --- 4. HANDLE BUTTON CLICK (The "Starter") ---
+        if start_btn:
+            # Add the user's topic choice to chat history
+            user_msg = f"Please tell me about my {q_topic}."
+            st.session_state.messages.append({"role": "user", "content": user_msg})
             
-            with st.spinner("Consulting stars..."):
+            with st.spinner("Consulting the stars..."):
                 try:
-                    # 1. Define Safety Settings (Crucial for Astrology to avoid "Medical/Fortune" blocks)
-                    safety_settings = [
-                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-                    ]
-                    
-                    # 2. Configure Model (Using your Gemini 2.0 Access)
-                    # We re-configure here to ensure the key is active for this specific request
+                    # Configure API
                     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
                     model = genai.GenerativeModel('gemini-2.0-flash')
                     
-                    # 3. Generate with Safety Settings applied
-                    response = model.generate_content(prompt, safety_settings=safety_settings)
+                    # Full Prompt = Context + Question
+                    full_prompt = system_context + "\n\n" + user_msg
                     
-                    # 4. Display Result safely
-                    if response.text:
-                        st.info(response.text)
-                    else:
-                        st.warning("The response was blocked by safety filters. Try a different topic.")
-                        
+                    response = model.generate_content(full_prompt)
+                    
+                    # Add AI response to history
+                    st.session_state.messages.append({"role": "assistant", "content": response.text})
                 except Exception as e:
-                    # Show the REAL error so we can fix it if it happens again
-                    st.error(f"Technical Error: {e}")
+                    st.error(f"Error: {e}")
+
+        # --- 5. DISPLAY CHAT HISTORY ---
+        # This shows the button result AND any follow-up chat
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # --- 6. CHAT INPUT (The "Follow-up") ---
+        if prompt := st.chat_input("Ask a follow-up question (e.g., 'When will this happen?')..."):
+            
+            # 1. Display User Message
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+
+            # 2. Generate AI Response
+            with st.chat_message("assistant"):
+                with st.spinner("Analyzing chart..."):
+                    try:
+                        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                        model = genai.GenerativeModel('gemini-2.0-flash')
+                        
+                        # We send the System Context + Last few messages so it remembers the conversation flow
+                        # (Simple logic: Context + User's new question is usually enough for simple tasks, 
+                        # but appending history makes it smarter)
+                        conversation_text = "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state.messages[-4:]])
+                        final_prompt = system_context + "\n\nRecent Conversation:\n" + conversation_text + "\n\nUser Question: " + prompt
+                        
+                        response = model.generate_content(final_prompt)
+                        st.markdown(response.text)
+                        
+                        # Save AI Response
+                        st.session_state.messages.append({"role": "assistant", "content": response.text})
+                        
+                    except Exception as e:
+                        st.error(f"Error: {e}")
 else:
     st.title("☸️ TaraVaani")
     st.info("👈 Enter details to generate chart.")

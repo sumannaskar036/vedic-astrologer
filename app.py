@@ -736,15 +736,35 @@ if st.session_state.current_data:
         st.subheader(f"Ask TaraVaani ({lang_opt})")
         q_topic = st.selectbox("Topic", ["General Life", "Career", "Marriage", "Health", "Wealth"])
         if st.button("✨ Get Prediction"):
-            prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']} ({d['Gender']}). Planetary Positions: {str(d['Planet_Details'])}. Question: Predict about {q_topic}. Start with 'Radhe Radhe 🙏'. Answer in {lang_opt}."
-            try:
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                response = model.generate_content(prompt)
-                st.info(response.text)
-            except Exception as e:
-                print(f"API Error: {e}")
-                st.warning("✨ The cosmic channels are momentarily quiet. Please try again in a few moments. 🙏")
-
+        # Define Safety Settings to prevent "Silent" blocking
+           safety_settings = [
+               {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+               {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+               {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+               {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+        
+             # Use a more detailed prompt
+             prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']} ({d['Gender']}). Planetary Positions: {str(d['Planet_Details'])}. Question: Predict about {q_topic} in {lang_opt}. Style: Mystic, positive."
+        
+             with st.spinner("Consulting stars..."):
+                 try:
+                      # 1. Authenticate with the NEW key and FORCE the REST transport
+                     genai.configure(api_key=st.secrets["GEMINI_API_KEY_NEW"], transport='rest')
+                
+                     # 2. Use the 'models/' prefix to force the Stable API
+                     model = genai.GenerativeModel('models/gemini-1.5-flash')
+                
+                     # 3. Generate with safety settings
+                     response = model.generate_content(prompt, safety_settings=safety_settings)
+                
+                     if response.text:
+                         st.info(response.text)
+                     else:
+                         st.error(f"Blocked. Reason: {response.prompt_feedback}")
+                 except Exception as e:
+                # Show the REAL error
+                     st.error(f"Technical Error: {e}")
 else:
     st.title("☸️ TaraVaani")
     st.info("👈 Enter details to generate chart.")

@@ -739,16 +739,38 @@ if st.session_state.current_data:
     with tab6:
         st.subheader(f"Ask TaraVaani ({lang_opt})")
         q_topic = st.selectbox("Topic", ["General Life", "Career", "Marriage", "Health", "Wealth"])
+        
         if st.button("✨ Get Prediction"):
+            # Prepare the prompt
             prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']} ({d['Gender']}). Planetary Positions: {str(d['Planet_Details'])}. Question: Predict about {q_topic}. Start with 'Radhe Radhe 🙏'. Answer in {lang_opt}."
-            try:
-                model = genai.GenerativeModel('gemini-2.0-flash')
-                response = model.generate_content(prompt)
-                st.info(response.text)
-            except Exception as e:
-                print(f"API Error: {e}")
-                st.warning("✨ The cosmic channels are momentarily quiet. Please try again in a few moments. 🙏")
-
+            
+            with st.spinner("Consulting stars..."):
+                try:
+                    # 1. Define Safety Settings (Crucial for Astrology to avoid "Medical/Fortune" blocks)
+                    safety_settings = [
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                    ]
+                    
+                    # 2. Configure Model (Using your Gemini 2.0 Access)
+                    # We re-configure here to ensure the key is active for this specific request
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    model = genai.GenerativeModel('gemini-2.0-flash')
+                    
+                    # 3. Generate with Safety Settings applied
+                    response = model.generate_content(prompt, safety_settings=safety_settings)
+                    
+                    # 4. Display Result safely
+                    if response.text:
+                        st.info(response.text)
+                    else:
+                        st.warning("The response was blocked by safety filters. Try a different topic.")
+                        
+                except Exception as e:
+                    # Show the REAL error so we can fix it if it happens again
+                    st.error(f"Technical Error: {e}")
 else:
     st.title("☸️ TaraVaani")
     st.info("👈 Enter details to generate chart.")

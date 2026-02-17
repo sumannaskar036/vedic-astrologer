@@ -745,26 +745,26 @@ if st.session_state.current_data:
             ]
         
              # Use a more detailed prompt
-             prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']} ({d['Gender']}). Planetary Positions: {str(d['Planet_Details'])}. Question: Predict about {q_topic} in {lang_opt}. Style: Mystic, positive."
+            prompt = f"Act as Vedic Astrologer TaraVaani. User: {d['Name']} ({d['Gender']}). Planetary Positions: {str(d['Planet_Details'])}. Question: Predict about {q_topic} in {lang_opt}. Style: Mystic, positive."
         
-             with st.spinner("Consulting stars..."):
-                 try:
+            with st.spinner("Consulting stars..."):
+                try:
                       # 1. Authenticate with the NEW key and FORCE the REST transport
-                     genai.configure(api_key=st.secrets["GEMINI_API_KEY_NEW"], transport='rest')
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY_NEW"], transport='rest')
                 
                      # 2. Use the 'models/' prefix to force the Stable API
-                     model = genai.GenerativeModel('models/gemini-1.5-flash')
+                    model = genai.GenerativeModel('models/gemini-1.5-flash')
                 
                      # 3. Generate with safety settings
-                     response = model.generate_content(prompt, safety_settings=safety_settings)
+                    response = model.generate_content(prompt, safety_settings=safety_settings)
                 
-                     if response.text:
-                         st.info(response.text)
-                     else:
-                         st.error(f"Blocked. Reason: {response.prompt_feedback}")
-                 except Exception as e:
+                    if response.text:
+                        st.info(response.text)
+                    else:
+                        st.error(f"Blocked. Reason: {response.prompt_feedback}")
+                except Exception as e:
                 # Show the REAL error
-                     st.error(f"Technical Error: {e}")
+                    st.error(f"Technical Error: {e}")
 else:
     st.title("☸️ TaraVaani")
     st.info("👈 Enter details to generate chart.")

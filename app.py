@@ -320,6 +320,7 @@ def get_detailed_interpretations(asc_sign_name):
 
 # --- DASHA FUNCTIONS (MUST BE DEFINED HERE) ---
 def calculate_vimshottari_structure(jd, birth_date):
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
     moon_pos = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
     nak_deg = (moon_pos * (27/360)) 
     nak_idx = int(nak_deg)

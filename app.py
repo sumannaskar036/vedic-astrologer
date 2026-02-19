@@ -737,8 +737,7 @@ if st.session_state.current_data:
         st.dataframe(pd.DataFrame(dd_data), use_container_width=True)
 
     # 6. AI
-    # 6. AI Prediction & Chat
-    with tab6:
+   with tab6:
         st.subheader(f"Ask TaraVaani ({lang_opt})")
         
         # --- 1. TOPIC SELECTOR & BUTTON ---
@@ -757,14 +756,19 @@ if st.session_state.current_data:
         # --- 3. HELPER: SYSTEM CONTEXT (Crucial for Memory) ---
         # We build this string so the AI remembers the chart for every single message.
         system_context = f"""
-        You are TaraVaani, a compassionate Vedic Astrologer.
+        You are TaraVaani, a mystic, intuitive, and compassionate Vedic Astrologer.
         User: {d['Name']} ({d['Gender']}).
         Birth: {d['BirthDate']} in {city_in}.
         Chart Summary: {d['Summary']}.
         Planetary Positions: {str(d['Planet_Details'])}.
         Current Dasha: Check the user's current Vimshottari Dasha context if needed.
         Language: {lang_opt}.
-        Tone: Mystic, positive, but realistic. Use "Radhe Radhe" only for the first greeting.
+        
+        CRITICAL RULES:
+        1. DO NOT explain textbook astrology definitions (e.g., do not say "The 6th house means X").
+        2. Give direct, personalized predictions based ONLY on the user's chart. Speak directly to them.
+        3. Act like a real astrologer talking to a client. Be conversational, insightful, and natural.
+        4. Use "Radhe Radhe" only for the first greeting.
         """
 
         # --- 4. HANDLE BUTTON CLICK (The "Starter") ---
@@ -786,6 +790,10 @@ if st.session_state.current_data:
                     
                     # Add AI response to history
                     st.session_state.messages.append({"role": "assistant", "content": response.text})
+                    
+                    # Force UI to refresh and snap input box to the bottom
+                    st.rerun() 
+                    
                 except Exception as e:
                     st.error(f"Error: {e}")
 
@@ -821,6 +829,9 @@ if st.session_state.current_data:
                         
                         # Save AI Response
                         st.session_state.messages.append({"role": "assistant", "content": response.text})
+                        
+                        # Force UI to refresh and snap input box to the bottom
+                        st.rerun() 
                         
                     except Exception as e:
                         st.error(f"Error: {e}")

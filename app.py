@@ -510,7 +510,43 @@ def draw_chart(house_planets, asc_sign, style="North", title="Chart"):
             ax.text(x, y-0.08, str(sign_num), fontsize=6, color='red', ha='center')
             if house_planets[h]:
                 ax.text(x, y, "\n".join(house_planets[h]), fontsize=6, fontweight='bold', ha='center', va='center')
-    else:
+                
+    elif style == "East":
+        # 1. Draw 3x3 outer grid lines
+        ax.plot([0, 3, 3, 0, 0], [0, 0, 3, 3, 0], 'k-', lw=1) # Outer border
+        ax.plot([1, 1], [0, 3], 'k-', lw=1) # Vertical line 1
+        ax.plot([2, 2], [0, 3], 'k-', lw=1) # Vertical line 2
+        ax.plot([0, 3], [1, 1], 'k-', lw=1) # Horizontal line 1
+        ax.plot([0, 3], [2, 2], 'k-', lw=1) # Horizontal line 2
+        
+        # 2. Draw corner diagonals to form the triangles
+        ax.plot([0, 1], [3, 2], 'k-', lw=1) # Top-Left
+        ax.plot([0, 1], [0, 1], 'k-', lw=1) # Bottom-Left
+        ax.plot([2, 3], [1, 0], 'k-', lw=1) # Bottom-Right
+        ax.plot([2, 3], [2, 3], 'k-', lw=1) # Top-Right
+        
+        # 3. Add blank center square
+        rect = patches.Rectangle((1, 1), 1, 1, color='white', zorder=10)
+        ax.add_patch(rect)
+        ax.text(1.5, 1.5, "Rashi", ha='center', va='center', fontsize=8, fontweight='bold', zorder=11)
+        
+        # 4. Map coordinates for fixed signs (1=Aries ... 12=Pisces)
+        east_pos = {
+            1: (1.5, 2.5), 2: (2.3, 2.7), 3: (2.7, 2.3), 4: (2.5, 1.5), 
+            5: (2.7, 0.7), 6: (2.3, 0.3), 7: (1.5, 0.5), 8: (0.7, 0.3), 
+            9: (0.3, 0.7), 10: (0.5, 1.5), 11: (0.3, 2.3), 12: (0.7, 2.7)
+        }
+        
+        # 5. Place planets correctly
+        for h, planets in house_planets.items():
+            sign = ((asc_sign + h - 2) % 12) + 1
+            x, y = east_pos[sign]
+            txt_p = "\n".join(planets)
+            if h == 1: txt_p += "\n(Asc)"
+            if txt_p.strip():
+                ax.text(x, y, txt_p, fontsize=6, fontweight='bold', ha='center', va='center', zorder=12)
+
+    else: # South Indian
         for i in [0, 0.25, 0.5, 0.75, 1]:
             ax.plot([0, 1], [i, i], 'k-', lw=1)
             ax.plot([i, i], [0, 1], 'k-', lw=1)
@@ -523,7 +559,9 @@ def draw_chart(house_planets, asc_sign, style="North", title="Chart"):
             x, y = sign_pos[sign]
             txt_p = "\n".join(planets)
             if h == 1: txt_p += "\n(Asc)"
-            ax.text(x, y, txt_p, fontsize=6, fontweight='bold', ha='center', va='center')
+            if txt_p.strip():
+                ax.text(x, y, txt_p, fontsize=6, fontweight='bold', ha='center', va='center', zorder=12)
+                
     return fig
 
 # --- 4. SESSION STATE ---
@@ -642,47 +680,6 @@ if st.session_state.current_data:
         with c2: st.pyplot(draw_chart(d['Charts']['D9'], d9_asc_sign, style, "Navamsa Chart (D9)"))
         
         st.divider()
-        # --- EAST INDIAN CHART DISPLAY ---
-        st.subheader("East Indian Chart (Rashi Chakra)")
-
-        # Define the zodiac names explicitly right here so it doesn't crash
-        zodiac_names = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
-    
-        # 1. Define the East Indian Layout (Fixed Signs)
-        # Row 1: Pisces (11), Aries (0), Taurus (1), Gemini (2)
-        # Row 2: Aquarius (10), [Space], [Space], Cancer (3)
-        # Row 3: Capricorn (9), [Space], [Space], Leo (4)
-        # Row 4: Sagittarius (8), Scorpio (7), Libra (6), Virgo (5)
-        grid_layout = [
-            [11, 0, 1, 2],
-            [10, None, None, 3],
-            [9, None, None, 4],
-            [8, 7, 6, 5]
-        ]
-    
-        # 2. Draw the Grid
-        for row in grid_layout:
-            cols = st.columns(4)
-            for i, sign_idx in enumerate(row):
-                with cols[i]:
-                    if sign_idx is not None:
-                        # Get sign name and planets in it
-                        sign_name = zodiac_names[sign_idx]
-                        # We use .get() here to prevent errors if the key is missing
-                        planets_in_sign = d['Summary'].get('east_chart', {}).get(sign_idx, [])
-                        planet_str = ", ".join(planets_in_sign) if planets_in_sign else ""
-                    
-                        # Render the box
-                        st.markdown(f"""
-                        <div style="border: 1px solid #444; height: 100px; padding: 5px; text-align: center; border-radius: 5px; background-color: #222;">
-                            <div style="font-size: 10px; color: #888;">{sign_name}</div>
-                            <div style="font-weight: bold; color: #ffbd45; margin-top: 5px;">{planet_str}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.write("") # Empty space for the middle
-
-        st.divider() # Adds a line to separate it from the table below
         st.subheader("Planetary Details & Status")
         st.dataframe(pd.DataFrame(d['Planet_Details']), use_container_width=True)
         

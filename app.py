@@ -694,7 +694,7 @@ if st.session_state.current_data:
             """)
 
     # 3. KP SYSTEM
-   with tab3:
+    with tab3:
         st.markdown("### Krishnamurti Paddhati (KP)")
         
         # --- ADDED: Dropdown for KP Chart Style ---

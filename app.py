@@ -470,7 +470,22 @@ def get_planet_positions(jd, lat, lon, birth_dt, lang):
         **get_detailed_interpretations(zodiac_list[int(raw_bodies["Ascendant"]/30) % 12]),
         **get_nakshatra_properties(nak_list[int(moon_pos / (360/27)) % 27], zodiac_list[int(moon_pos/30) % 12], charan)
     }
+    # --- KAL SARPA & EAST INDIAN LOGIC ---
+    # 1. Calculate Kal Sarpa
+    rahu_deg = raw_bodies["Rahu"]
+    side1, side2 = True, True
+    for p in ["Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn"]:
+        diff = (raw_bodies[p] - rahu_deg) % 360
+        if diff > 180: side1 = False
+        if diff < 180: side2 = False
+    summary["Kalsarpa"] = "Yes" if (side1 or side2) else "No"
 
+    # 2. Calculate East Indian Data
+    east_chart_data = {i: [] for i in range(12)}
+    for p_name, p_pos in raw_bodies.items():
+        sign_idx = int(p_pos / 30)
+        east_chart_data[sign_idx].append(p_name[:2])
+    summary["east_chart"] = east_chart_data
     return charts_data, planet_details, kp_planets, kp_cusps, ruling_planets, summary, raw_bodies
 
 # --- VISUALIZATION ---

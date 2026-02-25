@@ -639,6 +639,44 @@ if st.session_state.current_data:
         with c2: st.pyplot(draw_chart(d['Charts']['D9'], d9_asc_sign, style, "Navamsa Chart (D9)"))
         
         st.divider()
+        # --- EAST INDIAN CHART DISPLAY ---
+        st.subheader("East Indian Chart (Rashi Chakra)")
+    
+        # 1. Define the East Indian Layout (Fixed Signs)
+        # Row 1: Pisces (11), Aries (0), Taurus (1), Gemini (2)
+        # Row 2: Aquarius (10), [Space], [Space], Cancer (3)
+        # Row 3: Capricorn (9), [Space], [Space], Leo (4)
+        # Row 4: Sagittarius (8), Scorpio (7), Libra (6), Virgo (5)
+        grid_layout = [
+            [11, 0, 1, 2],
+            [10, None, None, 3],
+            [9, None, None, 4],
+            [8, 7, 6, 5]
+        ]
+    
+        # 2. Draw the Grid
+        for row in grid_layout:
+            cols = st.columns(4)
+            for i, sign_idx in enumerate(row):
+                with cols[i]:
+                    if sign_idx is not None:
+                        # Get sign name and planets in it
+                        sign_name = zodiac_list[sign_idx]
+                        # We use .get() here to prevent errors if the key is missing
+                        planets_in_sign = d['Summary'].get('east_chart', {}).get(sign_idx, [])
+                        planet_str = ", ".join(planets_in_sign) if planets_in_sign else ""
+                    
+                        # Render the box
+                        st.markdown(f"""
+                        <div style="border: 1px solid #444; height: 100px; padding: 5px; text-align: center; border-radius: 5px; background-color: #222;">
+                            <div style="font-size: 10px; color: #888;">{sign_name}</div>
+                            <div style="font-weight: bold; color: #ffbd45; margin-top: 5px;">{planet_str}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.write("") # Empty space for the middle
+
+        st.divider() # Adds a line to separate it from the table below
         st.subheader("Planetary Details & Status")
         st.dataframe(pd.DataFrame(d['Planet_Details']), use_container_width=True)
         

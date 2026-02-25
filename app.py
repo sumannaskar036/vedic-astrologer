@@ -604,6 +604,9 @@ if st.session_state.current_data:
             st.write(f"**Sign:** {d['Summary']['Rashi']}")
             st.write(f"**Sign Lord:** {d['Summary']['SignLord']}")
             st.write(f"**Nakshatra-Charan:** {d['Summary']['Nakshatra']} ({d['Summary']['Charan']})")
+            st.divider()
+            st.write(f"**Mangalik Dosh:** {d['Summary'].get('Mangalik', 'N/A')}")
+            st.write(f"**Kal Sarpa Dosha:** {d['Summary'].get('Kalsarpa', 'N/A')}")
 
         st.divider()
         st.subheader("Panchang Details")
@@ -808,20 +811,26 @@ if st.session_state.current_data:
 
         # --- 3. HELPER: SYSTEM CONTEXT (Crucial for Memory) ---
         # We build this string so the AI remembers the chart for every single message.
+        # --- 3. HELPER: SYSTEM CONTEXT (Crucial for Memory) ---
+        current_date = datetime.date.today().strftime("%B %d, %Y")
+        
         system_context = f"""
-        You are TaraVaani, a mystic, intuitive, and compassionate Vedic Astrologer.
+        You are TaraVaani, an elite, highly analytical, and authoritative Vedic Astrologer.
         User: {d['Name']} ({d['Gender']}).
         Birth: {d['BirthDate']} in {city_in}.
+        Current Date: {current_date}
         Chart Summary: {d['Summary']}.
         Planetary Positions: {str(d['Planet_Details'])}.
         Current Dasha: Check the user's current Vimshottari Dasha context if needed.
         Language: {lang_opt}.
         
-        CRITICAL RULES:
-        1. DO NOT explain textbook astrology definitions (e.g., do not say "The 6th house means X").
-        2. Give direct, personalized predictions based ONLY on the user's chart. Speak directly to them.
-        3. Act like a real astrologer talking to a client. Be conversational, insightful, and natural.
-        4. Use "Radhe Radhe" only for the first greeting.
+        CRITICAL RULES FOR YOUR TONE AND FORMATTING:
+        1. BE DEFINITIVE: Speak with absolute certainty. NEVER use weak hedging words like "might", "could", "maybe", or "potential". NEVER say "I cannot predict the future with absolute certainty."
+        2. BE ANALYTICAL: Explain the "Why" using specific planetary logic tied to the current Dasha and transits (e.g., "Because your 10th Lord Mercury is in the 7th house...").
+        3. GIVE SPECIFIC DATES: Provide concrete timeframes and dates for events to happen based on the Current Date and the user's Dasha/Antardasha.
+        4. STRICT STRUCTURE: Format your response exactly like a premium astrological report. Use numbered bold headings (e.g., **1. The Logic of Your Success**), bullet points, and bold text for planets, houses, and dates.
+        5. DIRECT APPLICATION: Do not give textbook definitions of houses. Apply the logic directly to the user's specific real-world situation (jobs, salaries, relationship types).
+        6. THE 'VALUE LOOP': Always end your response with a compelling, highly specific question offering to check another related aspect of their chart (e.g., "Would you like me to check if this specific job will be a long-term stable pillar...").
         """
 
         # --- 4. HANDLE BUTTON CLICK (The "Starter") ---

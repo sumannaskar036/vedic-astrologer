@@ -671,8 +671,8 @@ if st.session_state.current_data:
 
     # 2. KUNDALIS
     with tab2:
-        c_type = st.selectbox("Style:", ["North Indian", "South Indian"])
-        style = "North" if "North" in c_type else "South"
+        c_type = st.selectbox("Style:", ["North Indian", "South Indian", "East Indian"], key="kundali_style")
+        style = c_type.split()[0]
         c1, c2 = st.columns(2)
         d1_asc_sign = int(d['Raw_Bodies']['Ascendant'] / 30) + 1
         d9_asc_sign = calculate_varga_sign(d['Raw_Bodies']['Ascendant'], 9)
@@ -694,13 +694,22 @@ if st.session_state.current_data:
             """)
 
     # 3. KP SYSTEM
-    with tab3:
+   with tab3:
         st.markdown("### Krishnamurti Paddhati (KP)")
+        
+        # --- ADDED: Dropdown for KP Chart Style ---
+        kp_type = st.selectbox("KP Chart Style:", ["North Indian", "South Indian", "East Indian"], key="kp_chart_style")
+        kp_style = kp_type.split()[0] # This grabs "North", "South", or "East"
+        
         c1, c2 = st.columns(2)
-        with c1: st.pyplot(draw_chart(d['Charts']['Chalit'], int(d['Raw_Bodies']['Ascendant'] / 30) + 1, "North", "Bhav Chalit"))
+        # --- UPDATED: Passed kp_style instead of hardcoded "North" ---
+        with c1: 
+            st.pyplot(draw_chart(d['Charts']['Chalit'], int(d['Raw_Bodies']['Ascendant'] / 30) + 1, kp_style, "Bhav Chalit"))
+        
         with c2: 
             st.write("Ruling Planets")
             st.dataframe(pd.DataFrame(d['Ruling_Planets']), use_container_width=True)
+            
         st.divider()
         c3, c4 = st.columns(2)
         with c3:
@@ -713,8 +722,10 @@ if st.session_state.current_data:
     # 4. CHARTS (ALL 19)
     with tab4:
         st.subheader("Shodashvarga & Divisional Charts")
-        c_style_all = st.selectbox("All Charts Style:", ["North Indian", "South Indian"], key="c_all")
-        style_all = "North" if "North" in c_style_all else "South"
+        
+        # --- UPDATED: Added East Indian to dropdown and fixed style selection ---
+        c_style_all = st.selectbox("All Charts Style:", ["North Indian", "South Indian", "East Indian"], key="c_all")
+        style_all = c_style_all.split()[0]  # Extracts exactly "North", "South", or "East"
         
         chart_list = [
             ("Lagna (D1)", "D1", 1), ("Hora (D2) - Wealth", "D2", 2), ("Drekkana (D3) - Siblings", "D3", 3),
@@ -733,6 +744,8 @@ if st.session_state.current_data:
                     if key == "Sun": asc_s = int(d['Raw_Bodies']['Sun'] / 30) + 1
                     elif key == "Moon": asc_s = int(d['Raw_Bodies']['Moon'] / 30) + 1
                     else: asc_s = calculate_varga_sign(d['Raw_Bodies']['Ascendant'], v_num)
+                    
+                    # The style_all variable now smoothly passes "East" to the engine!
                     st.pyplot(draw_chart(d['Charts'][key], asc_s, style_all, title))
 
     # 5. DASHAS

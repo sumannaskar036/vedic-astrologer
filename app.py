@@ -644,6 +644,9 @@ if st.session_state.current_data:
         st.divider()
         # --- EAST INDIAN CHART DISPLAY ---
         st.subheader("East Indian Chart (Rashi Chakra)")
+
+        # Define the zodiac names explicitly right here so it doesn't crash
+        zodiac_names = ["Aries", "Taurus", "Gemini", "Cancer", "Leo", "Virgo", "Libra", "Scorpio", "Sagittarius", "Capricorn", "Aquarius", "Pisces"]
     
         # 1. Define the East Indian Layout (Fixed Signs)
         # Row 1: Pisces (11), Aries (0), Taurus (1), Gemini (2)

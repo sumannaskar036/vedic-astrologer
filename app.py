@@ -667,7 +667,7 @@ if st.session_state.current_data:
                 with cols[i]:
                     if sign_idx is not None:
                         # Get sign name and planets in it
-                        sign_name = zodiac_list[sign_idx]
+                        sign_name = zodiac_names[sign_idx]
                         # We use .get() here to prevent errors if the key is missing
                         planets_in_sign = d['Summary'].get('east_chart', {}).get(sign_idx, [])
                         planet_str = ", ".join(planets_in_sign) if planets_in_sign else ""
